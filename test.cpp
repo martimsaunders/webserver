@@ -79,3 +79,29 @@ int main() {
 	}
 	close (serverSocket);
 }
+
+/*Obrigatório no config file
+
+server {} múltiplos
+
+ listen
+
+ error_page
+
+ client_max_body_size
+
+ location
+
+ allowed_methods
+
+ return (redirect)
+
+ root
+
+ autoindex
+
+ index
+
+ upload + upload_store
+
+ cgi por extensão*/
