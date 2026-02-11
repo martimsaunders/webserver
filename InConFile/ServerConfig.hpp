@@ -6,7 +6,7 @@
 /*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/10 15:39:03 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/10 15:39:03 by mprazere         ###   ########.fr       */
+/*   Updated: 2026/02/11 15:47:44 by mprazere         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,7 +27,6 @@ struct		ServerConfig
 	std::string index;
 	std::map<int, std::string> error_pages;
 	std::vector<LocationConfig> locations;
-	std::map<std::string, std::string> cgi;
 };
 
 #endif
