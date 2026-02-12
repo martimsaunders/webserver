@@ -3,15 +3,16 @@
 /*                                                        :::      ::::::::   */
 /*   ParseConfig.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
+/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/10 14:46:34 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/11 15:41:17 by mprazere         ###   ########.fr       */
+/*   Updated: 2026/02/12 15:46:57 by praders          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "InConFile/Config.hpp"
-#include "InConFile/Token.hpp"
+#include "../InConFile/Config.hpp"
+#include "../InConFile/Token.hpp"
+#include "../InConFile/Parser.hpp"
 #include <cctype>
 #include <stdexcept>
 
@@ -26,12 +27,6 @@ std::string readFile(std::string const &path){
 	while (std::getline(infile, line))
 		content += line + "\n";
 	return (content);
-}
-
-Config parseConfig(std::vector<Token> const &tokens){
-	Config cfg;
-	
-	return (cfg);
 }
 
 void printTok(std::vector<Token> tokens){
@@ -50,7 +45,22 @@ int main(int argc, char **argv){
 		std::string text = readFile(argv[1]);
 		std::vector<Token> tokens = tokenize(text);
 		//printTok(tokens);
-		Config cfg = parseConfig(tokens);
+		Parser p(tokens);
+		Config server;
+		server = p.parseconfig();
+		std::cout << "Parsed servers: " << server.servers.size() << "\n";
+        for (size_t i = 0; i < server.servers.size(); ++i)
+        {
+            std::cout << "---- server[" << i << "] ----\n";
+            std::cout << "host: " << server.servers[i].host << "\n";
+            std::cout << "port: " << server.servers[i].port << "\n";
+            std::cout << "root: " << server.servers[i].root << "\n";
+            std::cout << "index: " << server.servers[i].index << "\n";
+            std::cout << "client_max_body_size: " << server.servers[i].client_max_body_size << "\n";
+            std::cout << "error_pages: " << server.servers[i].error_pages.size() << "\n";
+            std::cout << "locations: " << server.servers[i].locations.size() << "\n";
+        }
+		
 	}
 	catch(std::exception &e){
 		std::cout << "Error: " << e.what() << std::endl;

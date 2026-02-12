@@ -3,15 +3,15 @@
 /*                                                        :::      ::::::::   */
 /*   Tokenizer.cpp                                      :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
+/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/11 13:08:50 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/11 16:18:26 by mprazere         ###   ########.fr       */
+/*   Updated: 2026/02/12 15:47:10 by praders          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "InConFile/Config.hpp"
-#include "InConFile/Token.hpp"
+#include "../InConFile/Config.hpp"
+#include "../InConFile/Token.hpp"
 #include <cctype>
 
 static void skip(std::string const &text, size_t &i, int &line, int &col){

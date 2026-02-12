@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Token.hpp                                          :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
+/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/10 15:38:54 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/11 13:09:55 by mprazere         ###   ########.fr       */
+/*   Updated: 2026/02/12 12:11:15 by praders          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,7 @@
 
 # include <iostream>
 # include <string>
+# include <vector>
 
 enum			TokenType
 {
