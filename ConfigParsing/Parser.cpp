@@ -6,7 +6,7 @@
 /*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/12 12:58:51 by praders           #+#    #+#             */
-/*   Updated: 2026/02/13 12:37:10 by martimpraze      ###   ########.fr       */
+/*   Updated: 2026/02/13 15:19:20 by martimpraze      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -114,7 +114,7 @@ static ServerConfig defaultServerConfig(void){
 	server.port = 80;
 	server.client_max_body_size = 1 * 1024 * 1024;
 	server.host = "0.0.0.0";
-	server.root = "";
+	server.root = ".";
 	server.index = "";
 	return (server);
 }

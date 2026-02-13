@@ -102,3 +102,13 @@ void debugPrintConfig(const Config& cfg) {
 	}
 	std::cout << "===== END DUMP =====\n";
 }
+
+void printTok(std::vector<Token> tokens){
+	for (size_t i = 0; i < tokens.size(); i++){
+			std::string str[] = {"Identifier","String","Number","LBrace","RBrace","Semicolon","End"};
+			std::cout << "Word: " << tokens[i].value << std::endl;
+			std::cout << "Col:  " << tokens[i].col << std::endl;
+			std::cout << "Lin:  " << tokens[i].line << std::endl;
+			std::cout << "Type: " << str[tokens[i].type] << std::endl << std::endl;
+	}
+}

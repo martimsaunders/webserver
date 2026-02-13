@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Config.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
+/*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/10 15:38:57 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/11 16:13:51 by mprazere         ###   ########.fr       */
+/*   Updated: 2026/02/13 15:34:32 by martimpraze      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 # define CONFIG_HPP
 
 # include "ServerConfig.hpp"
+# include "Token.hpp"
 # include <fstream>
 # include <iostream>
 # include <string>
@@ -23,5 +24,10 @@ struct	Config
 {
 	std::vector<ServerConfig> servers;
 };
+
+void	validateConfig(Config const &cfg);
+void	debugPrintConfig(const Config &cfg);
+void	printTok(std::vector<Token> tokens);
+Config	createConfig(std::string const &path);
 
 #endif
