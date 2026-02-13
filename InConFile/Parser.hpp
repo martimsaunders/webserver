@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Parser.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
+/*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/12 12:58:55 by praders           #+#    #+#             */
-/*   Updated: 2026/02/12 17:28:37 by praders          ###   ########.fr       */
+/*   Updated: 2026/02/13 09:46:49 by martimpraze      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,8 +28,8 @@ struct Config;
 
 class ParseError : public std::runtime_error{
 	public:
-		int col;
 		int line;
+		int col;
 		virtual ~ParseError(void) throw();
 		ParseError(void);
 		ParseError(ParseError const &other);
@@ -41,13 +41,13 @@ class ParseError : public std::runtime_error{
 
 class Parser{
 	public:
-		Config parseconfig(void);
-		LocationConfig parselocation(std::string const &path);
 		Parser(void);
 		Parser(Parser const &other);
 		Parser &operator=(Parser const &other);
 		~Parser(void);
 		explicit Parser(std::vector<Token> const &Tokens);
+		Config parseconfig(void);
+		LocationConfig parselocation(std::string const &path, ServerConfig const &srv);
 	private:
 		bool match(TokenType type) const;
 		bool matchIdent(std::string const &kw) const;
@@ -57,8 +57,8 @@ class Parser{
 		Token const &peek(size_t offset = 0) const;
 		Token const &expect(TokenType type, char const *msg);
 		ServerConfig parseserver();
-		size_t _pos;
 		std::vector<Token> const *_token;
+		size_t _pos;
 };
 
 #endif

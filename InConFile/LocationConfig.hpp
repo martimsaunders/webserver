@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   LocationConfig.hpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
+/*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/10 15:39:00 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/12 17:53:33 by praders          ###   ########.fr       */
+/*   Updated: 2026/02/13 09:40:11 by martimpraze      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,11 +26,13 @@ struct		LocationConfig
 	bool	allow_delete;
 	bool	has_redirect;
 	bool	upload_enabled;
+	size_t	client_max_body_size;
 	std::string path;
 	std::string root;
 	std::string index;
 	std::string upload_store;
 	std::string redirect_target;
+	std::map<int, std::string> error_pages;
 	std::map<std::string, std::string> cgi;
 };
 

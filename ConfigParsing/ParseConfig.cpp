@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ParseConfig.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
+/*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/10 14:46:34 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/12 15:46:57 by praders          ###   ########.fr       */
+/*   Updated: 2026/02/13 12:55:37 by martimpraze      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,8 @@
 #include "../InConFile/Parser.hpp"
 #include <cctype>
 #include <stdexcept>
+
+void debugPrintConfig(const Config& cfg);
 
 std::string readFile(std::string const &path){
 	std::ifstream infile(path.c_str());
@@ -46,21 +48,9 @@ int main(int argc, char **argv){
 		std::vector<Token> tokens = tokenize(text);
 		//printTok(tokens);
 		Parser p(tokens);
-		Config server;
-		server = p.parseconfig();
-		std::cout << "Parsed servers: " << server.servers.size() << "\n";
-        for (size_t i = 0; i < server.servers.size(); ++i)
-        {
-            std::cout << "---- server[" << i << "] ----\n";
-            std::cout << "host: " << server.servers[i].host << "\n";
-            std::cout << "port: " << server.servers[i].port << "\n";
-            std::cout << "root: " << server.servers[i].root << "\n";
-            std::cout << "index: " << server.servers[i].index << "\n";
-            std::cout << "client_max_body_size: " << server.servers[i].client_max_body_size << "\n";
-            std::cout << "error_pages: " << server.servers[i].error_pages.size() << "\n";
-            std::cout << "locations: " << server.servers[i].locations.size() << "\n";
-        }
-		
+		Config cfg;
+		cfg = p.parseconfig();
+		debugPrintConfig(cfg);
 	}
 	catch(std::exception &e){
 		std::cout << "Error: " << e.what() << std::endl;

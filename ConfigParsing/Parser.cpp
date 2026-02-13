@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Parser.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
+/*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/12 12:58:51 by praders           #+#    #+#             */
-/*   Updated: 2026/02/12 17:36:10 by praders          ###   ########.fr       */
+/*   Updated: 2026/02/13 12:37:10 by martimpraze      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -112,7 +112,7 @@ Config Parser::parseconfig(void){
 static ServerConfig defaultServerConfig(void){
 	ServerConfig server;
 	server.port = 80;
-	server.client_max_body_size = 0;
+	server.client_max_body_size = 1 * 1024 * 1024;
 	server.host = "0.0.0.0";
 	server.root = "";
 	server.index = "";
@@ -187,7 +187,7 @@ ServerConfig Parser::parseserver(){
 		else if (name == "host"){
 			if (seen_host)
 				throw ParseError("duplicate 'host' in server block", peek());
-			if (!(match(Identifier) || match(String) || match(Number)))
+			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected value after host", peek());
 			srv.host = consume().value;
 			expectSemicolon();
@@ -196,8 +196,8 @@ ServerConfig Parser::parseserver(){
 		else if (name == "root"){
 			if (seen_root)
 				throw ParseError("duplicate 'root' in server block", peek());
-			if (!(match(Identifier) || match(String) || match(Number)))
-				throw ParseError("expected value after root", peek());
+			if (!(match(Identifier) || match(String)))
+				throw ParseError("expected path after root", peek());
 			srv.root = consume().value;
 			expectSemicolon();
 			seen_root = true;
@@ -205,8 +205,8 @@ ServerConfig Parser::parseserver(){
 		else if (name == "index"){
 			if (seen_index)
 				throw ParseError("duplicate 'index' in server block", peek());
-			if (!(match(Identifier) || match(String) || match(Number)))
-				throw ParseError("expected value after index", peek());
+			if (!(match(Identifier) || match(String)))
+				throw ParseError("expected path after index", peek());
 			srv.index = consume().value;
 			expectSemicolon();
 			seen_index = true;
@@ -239,7 +239,7 @@ ServerConfig Parser::parseserver(){
 				throw ParseError("status code out of range in error_page", peek());
 			int code = static_cast<int>(codeL);
 			consume();
-			if (!(match(Identifier) || match(String) || match(Number)))
+			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after error_page <code>", peek());
 			std::string path = consume().value;
 			if (srv.error_pages.find(code) != srv.error_pages.end())
@@ -248,10 +248,13 @@ ServerConfig Parser::parseserver(){
 			expectSemicolon();
 		}
 		else if (name == "location"){
-			if (!(match(Identifier) || match(String) || match(Number)))
+			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after location", peek());
 			std::string path = consume().value;
-			LocationConfig loc = parselocation(path);
+			LocationConfig loc = parselocation(path, srv);
+			for (size_t i = 0; i < srv.locations.size(); i++)
+				if (srv.locations[i].path == path)
+					throw ParseError("duplicate location path in server block", peek());
 			srv.locations.push_back(loc);
 		}
 		else{
@@ -259,10 +262,14 @@ ServerConfig Parser::parseserver(){
 		}
 	}
 	expect(RBrace, "expected '}' to close server block");
+	for (size_t i = 0; i < srv.locations.size(); i++)
+		for (std::map<int, std::string>::const_iterator it = srv.error_pages.begin(); it != srv.error_pages.end(); ++it)
+			if (srv.locations[i].error_pages.count(it->first) == 0)
+				srv.locations[i].error_pages[it->first] = it->second;
 	return (srv);
 }
 
-static LocationConfig defaultLocationConfig(std::string const &path){
+static LocationConfig defaultLocationConfig(std::string const &path, ServerConfig const &srv){
 	LocationConfig loc;
 	loc.path = path;
 	loc.redirect_code = 0;
@@ -272,10 +279,185 @@ static LocationConfig defaultLocationConfig(std::string const &path){
 	loc.autoindex = false;
 	loc.has_redirect = false;
 	loc.upload_enabled = false;
-	loc.root = 
+	loc.client_max_body_size = srv.client_max_body_size;
+	loc.root = srv.root;
+	loc.index = srv.index;
+	loc.upload_store = "";
+	loc.redirect_target = "";
+	return (loc);
 }
 
-LocationConfig Parser::parselocation(std::string const &path){
-	expect(LBrace, "expected '{' after server");
-	LocationConfig loc = defaultLocationConfig(path);
+LocationConfig Parser::parselocation(std::string const &path, ServerConfig const &srv){
+	expect(LBrace, "expected '{' after location");
+	LocationConfig loc = defaultLocationConfig(path, srv);
+	bool seen_allow_methods = false;
+	bool seen_autoindex = false;
+	bool seen_root = false;
+	bool seen_index = false;
+	bool seen_client_max_body_size = false;
+	bool seen_upload_store = false;
+	bool seen_upload = false;
+	bool seen_return = false;
+	while(!match(RBrace)){
+		if (match(End))
+			throw ParseError("unexpected end of file inside location block", peek());
+		if (!match(Identifier))
+			throw ParseError("expected directive name inside location block", peek());
+		std::string name = consume().value;
+		if (name == "allow_methods"){
+			if (seen_allow_methods)
+				throw ParseError("duplicate 'allow_methods' in location block", peek());
+			if (match(Semicolon))
+				throw ParseError("allow_methods requires at least one method", peek());
+			loc.allow_get = false;
+			loc.allow_post = false;
+			loc.allow_delete = false;
+			while (!match(Semicolon)){
+				if (match(End))
+					throw ParseError("unexpected end of file in allow_methods", peek());
+				if (!match(Identifier))
+					throw ParseError("expected method name in allow_methods", peek());
+				std::string m = consume().value;
+				if (m == "GET") loc.allow_get = true;
+				else if (m == "POST") loc.allow_post = true;
+				else if (m == "DELETE") loc.allow_delete = true;
+				else
+					throw ParseError("expected method name in allow_methods", peek());
+			}
+			expectSemicolon();
+			seen_allow_methods = true;
+		}
+		else if (name == "autoindex"){
+			if (seen_autoindex)
+				throw ParseError("duplicate 'autoindex' in location block", peek());
+			if (!match(Identifier))
+				throw ParseError("expected 'on' or 'off' after autoindex", peek());
+			std::string v = consume().value;
+			if (v == "on") loc.autoindex = true;
+			else if ( v == "off") loc.autoindex = false;
+			else throw ParseError("autoindex must be 'on' or 'off'", peek());
+			expectSemicolon();
+			seen_autoindex = true;
+		}
+		else if (name == "root"){
+			if (seen_root)
+				throw ParseError("duplicate 'root' in location block", peek());
+			if (!(match(Identifier) || match(String)))
+				throw ParseError("expected path after root", peek());
+			loc.root = consume().value;
+			expectSemicolon();
+			seen_root = true;
+		}
+		else if (name == "index"){
+			if (seen_index)
+				throw ParseError("duplicate 'index' in location block", peek());
+			if (!(match(Identifier) || match(String)))
+				throw ParseError("expected path after index", peek());
+			loc.index = consume().value;
+			expectSemicolon();
+			seen_index = true;
+		}
+		else if (name == "client_max_body_size"){
+			if (seen_client_max_body_size)
+				throw ParseError("duplicate 'client_max_body_size' in location block", peek());
+			if (!match(Number))
+				throw ParseError("expected number after client_max_body_size", peek());
+			bool ok = false;
+			const size_t MAX_BODY_SIZE = 50 * 1024 * 1024;
+			size_t n = parseSizeTStrict(peek().value, ok);
+			if (!ok)
+				throw ParseError("invalid client_max_body_size", peek());
+			if (n > MAX_BODY_SIZE)
+				throw ParseError("client_max_body_size too large (Max 50MB)", peek());
+			consume();
+			loc.client_max_body_size = n;
+			expectSemicolon();
+			seen_client_max_body_size = true;
+		}
+		else if (name == "error_page"){
+			if (!match(Number))
+				throw ParseError("expected status code after error_page", peek());
+			bool ok = false;
+			long codeL = parseLongStrict(peek().value, ok);
+			if (!ok)
+				throw ParseError("invalid status code in error_page", peek());
+			if (codeL < 300 || codeL > 599)
+				throw ParseError("status code out of range in error_page", peek());
+			int code = static_cast<int>(codeL);
+			consume();
+			if (!(match(Identifier) || match(String)))
+				throw ParseError("expected path after error_page <code>", peek());
+			std::string path = consume().value;
+			if (loc.error_pages.find(code) != loc.error_pages.end())
+				throw ParseError("duplicate error_page code in location block", peek());
+			loc.error_pages[code] = path;
+			expectSemicolon();
+		}
+		else if (name == "upload"){
+			if (seen_upload)
+				throw ParseError("duplicate 'upload' in location block", peek());
+			if (!match(Identifier))
+				throw ParseError("expected 'on' or 'off' after upload", peek());
+			std::string v = consume().value;
+			if (v == "on") loc.upload_enabled = true;
+			else if ( v == "off") loc.upload_enabled = false;
+			else throw ParseError("upload must be 'on' or 'off'", peek());
+			expectSemicolon();
+			seen_upload = true;
+		}
+		else if (name == "upload_store"){
+			if (seen_upload_store)
+				throw ParseError("duplicate 'upload_store' in location block", peek());
+			if (!(match(Identifier) || match(String)))
+				throw ParseError("expected path after upload_store", peek());
+			loc.upload_store = consume().value;
+			expectSemicolon();
+			seen_upload_store = true;
+		}
+		else if (name == "return"){
+			if (seen_return)
+				throw ParseError("duplicate 'return' in location block", peek());
+			if (!match(Number))
+				throw ParseError("expected redirect code after return", peek());
+			bool ok = false;
+			long codeL = parseLongStrict(peek().value, ok);
+			if (!ok)
+				throw ParseError("invalid redirect code in return", peek());
+			if (codeL < 300 || codeL > 599)
+				throw ParseError("status code out of range in return", peek());
+			consume();
+			if (match(Semicolon)){
+				loc.redirect_code = static_cast<int>(codeL);
+				loc.has_redirect = true;
+				expectSemicolon();
+				seen_return = true;
+				continue;
+			}
+			if (!(match(Identifier) || match(String)))
+				throw ParseError("expected path after redirect code", peek());
+			loc.redirect_target = consume().value;
+			loc.redirect_code = static_cast<int>(codeL);
+			loc.has_redirect = true;
+			expectSemicolon();
+			seen_return = true;
+		}
+		else if (name == "cgi"){
+			if (!(match(Identifier) || match(String)))
+				throw ParseError("expected cgi extension after cgi", peek());
+			std::string ext = consume().value;
+			if (ext[0] != '.')
+				throw ParseError("cgi extension must start with '.'", peek());
+			if (!(match(Identifier) || match(String)))
+				throw ParseError("expected path after cgi extension", peek());
+			if (loc.cgi.count(ext))
+				throw ParseError("duplicate cgi extension in location block", peek());
+			loc.cgi[ext] = consume().value;
+			expectSemicolon();
+		}
+		else{
+			throw ParseError(("unknown directive in location: " + name).c_str(), peek());
+		}
+	}
+	expect(RBrace, "expected '}' to close location block");
+	return (loc);
 }
