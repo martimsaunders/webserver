@@ -14,11 +14,20 @@ class HttpRequest
 	public:
 		HttpRequest();
 
-		// Helper methods
+		// Getters
 		std::string getMethod() const;
 		std::string getUri() const;
 		std::string getVersion() const;
+
+		// Setters
+		void setMethod(const std::string& m);
+		void setUri(const std::string& u);
+		void setVersion(const std::string& v);
+		void addHeader(const std::string& key, const std::string& value);
+		void setBody(const std::string& b);
+
+
+		// Helper methods
 		bool hasHeader(const std::string& key) const;
-		std::string getHeader(const std::string& key) const;
-		bool matchesCgi(const std::string& extension) const;
+		bool tryGetHeader(const std::string& key, std::string& value) const;
 };

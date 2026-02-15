@@ -1,6 +1,7 @@
 
 //Main Server Logic
-/* Startup:
+/* 
+Startup:
     Parse config file
     Create ServerConfig objects
     Create ServerSocket per IP:Port
@@ -19,11 +20,13 @@ When request fully parsed:
         ↓
     HTTP layer serializes
         ↓
-    Network layer sends */
+    Network layer sends 
+*/
 
 
 //Application Layer logic
-/*When request fully parsed:
+/*
+When request fully parsed:
     RequestHandler::handleRequest(request, serverConfig)
         │
         ▼
@@ -58,3 +61,19 @@ When request fully parsed:
         ▼
     Return HttpResponse to HTTP layer
 */
+
+
+// Clean architecture
+/*
+HttpRequest        <- just data (method, uri, headers, body)
+Location           <- knows CGI extensions, root, methods allowed
+ServerConfig       <- owns locations
+RequestHandler     <- orchestrates logic, queries Location
+CGIHandler         <- executes CGI scripts
+HttpResponse       <- structured response container
+*/
+
+int main (void)
+{
+	
+}

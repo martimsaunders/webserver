@@ -2,6 +2,7 @@
 #include "HttpResponse.hpp"
 #include "ServerConfig.hpp"
 
+//Factory Class (separation of concerns)
 class ErrorResponseBuilder
 {
 	public:
