@@ -6,7 +6,7 @@
 class RequestHandler
 {
 	public:
-		HttpResponse handleRequest(
+		static HttpResponse handleRequest(
 			const HttpRequest& request,
 			const ServerConfig& server
 		);

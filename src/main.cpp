@@ -73,7 +73,12 @@ CGIHandler         <- executes CGI scripts
 HttpResponse       <- structured response container
 */
 
+#include "RequestHandler.hpp"
+
 int main (void)
 {
-	
+	ServerConfig config;
+	HttpRequest request;
+
+	HttpResponse response = RequestHandler::handleRequest(request, config);
 }
