@@ -3,14 +3,14 @@
 /*                                                        :::      ::::::::   */
 /*   Parser.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
+/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/12 12:58:51 by praders           #+#    #+#             */
-/*   Updated: 2026/02/13 15:19:20 by martimpraze      ###   ########.fr       */
+/*   Updated: 2026/02/16 11:25:13 by mprazere         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../InConFile/Parser.hpp"
+#include "../../inc/inc_conf_pars/Parser.hpp"
 #include <cstdlib>
 #include <sstream>
 #include <cerrno>

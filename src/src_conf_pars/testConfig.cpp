@@ -1,6 +1,6 @@
-#include "../InConFile/Config.hpp"
-#include "../InConFile/Token.hpp"
-#include "../InConFile/Parser.hpp"
+#include "../../inc/inc_conf_pars/Config.hpp"
+#include "../../inc/inc_conf_pars/Token.hpp"
+#include "../../inc/inc_conf_pars/Parser.hpp"
 #include <iostream>
 #include <map>
 #include <vector>
