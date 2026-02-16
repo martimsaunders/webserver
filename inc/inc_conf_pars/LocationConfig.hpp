@@ -3,17 +3,17 @@
 /*                                                        :::      ::::::::   */
 /*   LocationConfig.hpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
+/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/10 15:39:00 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/13 09:40:11 by martimpraze      ###   ########.fr       */
+/*   Updated: 2026/02/16 11:15:32 by mprazere         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef Location_Config_HPP
 # define Location_Config_HPP
 
-# include <iostream>
+# include <string>
 # include <map>
 # include <vector>
 

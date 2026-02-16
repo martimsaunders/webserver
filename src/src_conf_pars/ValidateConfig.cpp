@@ -3,14 +3,14 @@
 /*                                                        :::      ::::::::   */
 /*   ValidateConfig.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
+/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/13 14:33:57 by martimpraze       #+#    #+#             */
-/*   Updated: 2026/02/13 15:33:02 by martimpraze      ###   ########.fr       */
+/*   Updated: 2026/02/16 11:25:28 by mprazere         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../InConFile/Config.hpp"
+#include "../../inc/inc_conf_pars/Config.hpp"
 #include <set>
 #include <stdexcept>
 #include <sys/stat.h>

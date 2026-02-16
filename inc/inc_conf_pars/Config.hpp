@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Config.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: martimprazeresaunders <martimprazeresau    +#+  +:+       +#+        */
+/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/10 15:38:57 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/13 15:34:32 by martimpraze      ###   ########.fr       */
+/*   Updated: 2026/02/16 11:35:30 by mprazere         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
