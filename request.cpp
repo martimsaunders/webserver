@@ -6,7 +6,7 @@
 /*   By: mateferr <mateferr@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/12 14:56:33 by mateferr          #+#    #+#             */
-/*   Updated: 2026/02/12 17:58:04 by mateferr         ###   ########.fr       */
+/*   Updated: 2026/02/16 15:23:01 by mateferr         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,7 +19,7 @@
 
 enum ParseStatus { Incomplete, Complete, Error };
 
-enum State {
+enum RequestState {
   ReadingStartLineAndHeaders,
   ReadingContentLengthBody,
   ReadingChunkedBody
@@ -32,7 +32,7 @@ typedef struct s_HttpRequest {
   std::map<std::string, std::string> headers;  
   size_t bodySize;
   std::string body;
-  State state;
+  RequestState state;
   ParseStatus status;
 } t_HttpRequest;
 
