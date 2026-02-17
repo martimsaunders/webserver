@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: praders <praders@student.42.fr>            +#+  +:+       +#+         #
+#    By: mateferr <mateferr@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/11/12 12:09:56 by praders           #+#    #+#              #
-#    Updated: 2026/02/17 11:12:24 by praders          ###   ########.fr        #
+#    Updated: 2026/02/17 11:49:24 by mateferr         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -65,3 +65,4 @@ fclean: clean
 re: fclean all
 
 .PHONY: all clean fclean re mlx_download
+
