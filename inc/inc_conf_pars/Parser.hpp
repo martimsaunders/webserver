@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Parser.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
+/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/12 12:58:55 by praders           #+#    #+#             */
-/*   Updated: 2026/02/16 11:21:45 by mprazere         ###   ########.fr       */
+/*   Updated: 2026/02/17 12:48:34 by praders          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,27 +42,29 @@ class ParseError : public std::runtime_error
 
 class Parser
 {
-  public:
-	Parser(void);
-	Parser(Parser const &other);
-	Parser &operator=(Parser const &other);
-	~Parser(void);
-	explicit Parser(std::vector<Token> const &Tokens);
-	Config parseconfig(void);
-	LocationConfig parselocation(std::string const &path,
-		ServerConfig const &srv);
+	public:
+		Parser(void);
+		Parser(Parser const &other);
+		Parser &operator=(Parser const &other);
+		~Parser(void);
+		explicit Parser(std::vector<Token> const &Tokens);
+		Config parseconfig(void);
+		LocationConfig parselocation(std::string const &path, ServerConfig const &srv);
 
-  private:
-	bool match(TokenType type) const;
-	bool matchIdent(std::string const &kw) const;
-	void expectSemicolon(void);
-	Token const &consume(void);
-	Token const &expectIdent(char const *msg);
-	Token const &peek(size_t offset = 0) const;
-	Token const &expect(TokenType type, char const *msg);
-	ServerConfig parseserver();
-	std::vector<Token> const *_token;
-	size_t _pos;
+	private:
+		std::vector<Token> const *_token;
+		size_t _pos;
+
+	private:
+		bool match(TokenType type) const;
+		bool matchIdent(std::string const &kw) const;
+		void expectSemicolon(void);
+		Token const &consume(void);
+		Token const &expectIdent(char const *msg);
+		Token const &peek(size_t offset = 0) const;
+		Token const &expect(TokenType type, char const *msg);
+		ServerConfig parseserver();
+		
 };
 
 #endif

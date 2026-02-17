@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: mateferr <mateferr@student.42.fr>          +#+  +:+       +#+         #
+#    By: praders <praders@student.42.fr>            +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/11/12 12:09:56 by praders           #+#    #+#              #
-#    Updated: 2026/02/17 11:49:24 by mateferr         ###   ########.fr        #
+#    Updated: 2026/02/17 16:53:14 by praders          ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -15,6 +15,8 @@ NAME = webserv
 SRCS = src/src_conf_pars/ParseConfig.cpp src/src_conf_pars/Parser.cpp \
 src/src_conf_pars/testConfig.cpp src/src_conf_pars/Tokenizer.cpp \
 src/src_conf_pars/ValidateConfig.cpp \
+src/main.cpp \
+src/src_server/webserv.cpp \
 
 OBJ_DIR = obj
 OBJS = $(addprefix $(OBJ_DIR)/, $(SRCS:.cpp=.o))

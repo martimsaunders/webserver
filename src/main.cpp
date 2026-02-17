@@ -1,39 +1,27 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Socket.hpp                                         :+:      :+:    :+:   */
+/*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/02/16 11:01:06 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/17 16:31:55 by praders          ###   ########.fr       */
+/*   Created: 2026/02/17 12:18:13 by praders           #+#    #+#             */
+/*   Updated: 2026/02/17 17:11:51 by praders          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef SOCKET_HPP
-# define SOCKET_HPP
+#include "../inc/inc_conf_pars/Config.hpp"
+#include "../inc/inc_server/Webserv.hpp"
 
-# include <iostream>
-
-struct		Client
-{
-	int		fd;
-	int		listen_fd;
-	bool	want_write;
-	bool	should_close;
-	bool	header_parsed;
-	size_t	server_index;
-	size_t	expected_body;
-	std::string in;
-	std::string out;
-};
-
-struct		ListenSocket
-{
-	int		fd;
-	int		port;
-	size_t	server_index;
-	std::string host;
-};
-
-#endif
+int main(int argc, char **argv){
+	(void)argc;
+	try{
+		Config cfg = createConfig(argv[1]);
+		Webserv wbs(cfg);
+		wbs.run();
+	}
+	catch(std::exception &e){
+		std::cout << "Error: " << e.what() << std::endl;
+	}
+	return (0);
+}

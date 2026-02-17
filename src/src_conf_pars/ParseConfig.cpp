@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ParseConfig.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
+/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/10 14:46:34 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/16 11:25:09 by mprazere         ###   ########.fr       */
+/*   Updated: 2026/02/17 12:18:00 by praders          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,15 +39,4 @@ Config createConfig(std::string const &path){
 		validateConfig(cfg);
 		debugPrintConfig(cfg);
 		return (cfg);
-}
-
-int main(int argc, char **argv){
-	(void)argc;
-	try{
-		Config cfg = createConfig(argv[1]);
-	}
-	catch(std::exception &e){
-		std::cout << "Error: " << e.what() << std::endl;
-	}
-	return (0);
 }

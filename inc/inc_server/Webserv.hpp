@@ -1,38 +1,50 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Server.hpp                                         :+:      :+:    :+:   */
+/*   Webserv.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
+/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/16 16:24:48 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/16 16:38:03 by mprazere         ###   ########.fr       */
+/*   Updated: 2026/02/17 13:02:22 by praders          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef SERVER_HPP
-# define SERVER_HPP
+#ifndef WEBSERV_HPP
+# define WEBSERV_HPP
 
 # include "Socket.hpp"
-# include "../inc_conf_pars/ServerConfig.hpp"
+# include "../inc_conf_pars/Config.hpp"
 # include <map>
 # include <poll.h>
 # include <vector>
+# include <string>
 
-class Server
+class Webserv
 {
 	public:
-		Server(ServerConfig const &config);
+		explicit Webserv(Config const &config);
+		~Webserv();
 		void run();
 
 	private:
-		ServerConfig const &_config;
+		Webserv(Webserv const &other);
+		Webserv &operator=(Webserv const &other);
+
+	private:
+		Config _config;
 		std::vector<pollfd> _pfds;
 		std::map<int, ListenSocket> _listens;
 		std::map<int, Client> _clients;
 
 	private:
 		int createListenFd(std::string const &host, int port);
+		bool isListenFd(int fd) const;
+		void closeAll();
+		void addPollFd(int fd, short events);
+		void delPollFd(int fd);
+		void eventLoop();
+		void setupListening();
 		void acceptAll(int listen_fd);
 		void handleClientRead(int fd);
 		void handleClientWrite(int fd);
