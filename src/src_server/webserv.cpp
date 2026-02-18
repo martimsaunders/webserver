@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   webserv.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
+/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/17 12:20:57 by praders           #+#    #+#             */
-/*   Updated: 2026/02/17 17:12:03 by praders          ###   ########.fr       */
+/*   Updated: 2026/02/18 16:11:41 by mprazere         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -236,6 +236,7 @@ void Webserv::acceptAll(int listen_fd){
 
 void Webserv::handleClientRead(int fd){
 	(void) fd;
+	_config.servers[_clients[fd].server_index];
 }
 
 void Webserv::handleClientWrite(int fd){
