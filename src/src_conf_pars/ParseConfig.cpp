@@ -1,15 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   ParseConfig.cpp                                    :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: praders <praders@student.42.fr>            +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/02/10 14:46:34 by mprazere          #+#    #+#             */
-/*   Updated: 2026/02/17 12:18:00 by praders          ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
 #include "../../inc/inc_conf_pars/Config.hpp"
 #include "../../inc/inc_conf_pars/Token.hpp"
 #include "../../inc/inc_conf_pars/Parser.hpp"

@@ -1,15 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   webserv.cpp                                        :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: mprazere <mprazere@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/02/17 12:20:57 by praders           #+#    #+#             */
-/*   Updated: 2026/02/18 16:11:41 by mprazere         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
 #include "../../inc/inc_server/Webserv.hpp"
 #include <iostream>
 #include <cstring>
@@ -234,9 +222,45 @@ void Webserv::acceptAll(int listen_fd){
 	}
 }
 
+static std::string reseolveString(int const &status_code, std::string const &reasonPhrase, std::map<std::string, std::string> const &headers, std::string const &body){
+	std::ostringstream oss;
+	oss << "HTTP/1.1 " << status_code << " " << reasonPhrase << "\r\n";
+	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); it++)
+		oss << it->first << ":" << it->second << "\r\n";
+	oss << "\r\n";
+	oss << body;
+	return (oss.str());
+}
+
 void Webserv::handleClientRead(int fd){
-	(void) fd;
-	_config.servers[_clients[fd].server_index];
+	std::map<int, Client>::iterator it = _clients.find(fd);
+	if (it == _clients.end())
+		return;
+	Client &client = it->second;
+	char temp[4096];
+	while (true){
+		ssize_t len = recv(fd, temp, sizeof(temp), 0);
+		if (len > 0)
+			client.in.append(temp, len);
+		else if (len == 0){
+			client.should_close = true;
+			return ;
+		}
+		else{
+			if (errno == EINTR)
+				continue;
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
+				break;
+			client.should_close = true;
+			return;
+		}
+	}
+	while (true){
+		HttpRequest result = client.parse.parser(client.in, client.expected_body);
+		//agora checkar se incomplete error ou done
+		//se error chamar buildresponse
+		
+	}
 }
 
 void Webserv::handleClientWrite(int fd){
