@@ -178,6 +178,8 @@ ServerConfig Parser::parseserver(){
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected value after host", peek());
 			srv.host = consume().value;
+			if (srv.host.empty())
+				throw ParseError("host value cannot be empty", peek());
 			expectSemicolon();
 			seen_host = true;
 		}
@@ -186,7 +188,12 @@ ServerConfig Parser::parseserver(){
 				throw ParseError("duplicate 'root' in server block", peek());
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after root", peek());
-			srv.root = consume().value;
+			std::string path = consume().value;
+			if (path.empty())
+				throw ParseError("root path cannot be empty", peek());
+			if (path.size() > 1 && path[path.size() - 1] == '/')
+				throw ParseError("path root ends with /", peek());
+			srv.root = path;
 			expectSemicolon();
 			seen_root = true;
 		}
@@ -230,6 +237,8 @@ ServerConfig Parser::parseserver(){
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after error_page <code>", peek());
 			std::string path = consume().value;
+			if (path.empty())
+				throw ParseError("error_page path cannot be empty", peek());
 			if (srv.error_pages.find(code) != srv.error_pages.end())
 				throw ParseError("duplicate error_page code in server block", peek());
 			srv.error_pages[code] = path;
@@ -239,6 +248,12 @@ ServerConfig Parser::parseserver(){
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after location", peek());
 			std::string path = consume().value;
+			if (path.empty())
+				throw ParseError("location path cannot be empty", peek());
+			if (path[0] != '/')
+				throw ParseError("location path must start with '/'", peek());
+			if (path.size() > 1 && path[path.size() - 1] == '/')
+				throw ParseError("path location ends with /", peek());
 			LocationConfig loc = parselocation(path, srv);
 			for (size_t i = 0; i < srv.locations.size(); i++)
 				if (srv.locations[i].path == path)
@@ -246,7 +261,7 @@ ServerConfig Parser::parseserver(){
 			srv.locations.push_back(loc);
 		}
 		else{
-			throw ParseError(("unknown directive in server: " + name).c_str(), peek());
+			throw ParseError(std::string("unknown directive in server: ") + name, peek());
 		}
 	}
 	expect(RBrace, "expected '}' to close server block");
@@ -310,7 +325,7 @@ LocationConfig Parser::parselocation(std::string const &path, ServerConfig const
 				else if (m == "POST") loc.allow_post = true;
 				else if (m == "DELETE") loc.allow_delete = true;
 				else
-					throw ParseError("expected method name in allow_methods", peek());
+					throw ParseError(std::string("unsupported method in allow_methods: ") + m, peek());
 			}
 			expectSemicolon();
 			seen_allow_methods = true;
@@ -332,7 +347,12 @@ LocationConfig Parser::parselocation(std::string const &path, ServerConfig const
 				throw ParseError("duplicate 'root' in location block", peek());
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after root", peek());
-			loc.root = consume().value;
+			std::string path = consume().value;
+			if (path.empty())
+				throw ParseError("root path cannot be empty", peek());
+			if (path.size() > 1 && path[path.size() - 1] == '/')
+				throw ParseError("path root ends with /", peek());
+			loc.root = path;
 			expectSemicolon();
 			seen_root = true;
 		}
@@ -376,6 +396,8 @@ LocationConfig Parser::parselocation(std::string const &path, ServerConfig const
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after error_page <code>", peek());
 			std::string path = consume().value;
+			if (path.empty())
+				throw ParseError("error_page path cannot be empty", peek());
 			if (loc.error_pages.find(code) != loc.error_pages.end())
 				throw ParseError("duplicate error_page code in location block", peek());
 			loc.error_pages[code] = path;
@@ -399,6 +421,8 @@ LocationConfig Parser::parselocation(std::string const &path, ServerConfig const
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after upload_store", peek());
 			loc.upload_store = consume().value;
+			if (loc.upload_store.empty())
+				throw ParseError("upload_store path cannot be empty", peek());
 			expectSemicolon();
 			seen_upload_store = true;
 		}
@@ -424,6 +448,8 @@ LocationConfig Parser::parselocation(std::string const &path, ServerConfig const
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after redirect code", peek());
 			loc.redirect_target = consume().value;
+			if (loc.redirect_target.empty())
+				throw ParseError("return redirect target cannot be empty", peek());
 			loc.redirect_code = static_cast<int>(codeL);
 			loc.has_redirect = true;
 			expectSemicolon();
@@ -433,17 +459,22 @@ LocationConfig Parser::parselocation(std::string const &path, ServerConfig const
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected cgi extension after cgi", peek());
 			std::string ext = consume().value;
+			if (ext.empty())
+				throw ParseError("cgi extension cannot be empty", peek());
 			if (ext[0] != '.')
 				throw ParseError("cgi extension must start with '.'", peek());
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after cgi extension", peek());
 			if (loc.cgi.count(ext))
 				throw ParseError("duplicate cgi extension in location block", peek());
-			loc.cgi[ext] = consume().value;
+			std::string bin = consume().value;
+			if (bin.empty())
+				throw ParseError("cgi path cannot be empty", peek());
+			loc.cgi[ext] = bin;
 			expectSemicolon();
 		}
 		else{
-			throw ParseError(("unknown directive in location: " + name).c_str(), peek());
+			throw ParseError(std::string("unknown directive in location: ") + name, peek());
 		}
 	}
 	expect(RBrace, "expected '}' to close location block");

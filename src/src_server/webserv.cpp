@@ -222,7 +222,7 @@ void Webserv::acceptAll(int listen_fd){
 	}
 }
 
-static std::string reseolveString(int const &status_code, std::string const &reasonPhrase, std::map<std::string, std::string> const &headers, std::string const &body){
+/* static std::string resolveString(int const &status_code, std::string const &reasonPhrase, std::map<std::string, std::string> const &headers, std::string const &body){
 	std::ostringstream oss;
 	oss << "HTTP/1.1 " << status_code << " " << reasonPhrase << "\r\n";
 	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); it++)
@@ -230,7 +230,7 @@ static std::string reseolveString(int const &status_code, std::string const &rea
 	oss << "\r\n";
 	oss << body;
 	return (oss.str());
-}
+} */
 
 void Webserv::handleClientRead(int fd){
 	std::map<int, Client>::iterator it = _clients.find(fd);
@@ -255,12 +255,12 @@ void Webserv::handleClientRead(int fd){
 			return;
 		}
 	}
-	while (true){
+	/* while (true){
 		HttpRequest result = client.parse.parser(client.in, client.expected_body);
 		//agora checkar se incomplete error ou done
 		//se error chamar buildresponse
 		
-	}
+	} */
 }
 
 void Webserv::handleClientWrite(int fd){
