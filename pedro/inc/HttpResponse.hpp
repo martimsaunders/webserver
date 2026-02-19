@@ -24,4 +24,7 @@ class HttpResponse
 		void setReasonPhrase(const std::string &phrase);
 		void addHeader(const std::string& key, const std::string& value);
 		void setBody(const std::string& content);
+
+		// Helper methods
+		std::string toString();
 };
