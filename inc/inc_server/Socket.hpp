@@ -2,6 +2,7 @@
 # define SOCKET_HPP
 
 # include <iostream>
+# include "../../pedro/inc/HttpRequest.hpp"
 
 struct		Client
 {
@@ -14,6 +15,7 @@ struct		Client
 	size_t	expected_body;
 	std::string in;
 	std::string out;
+	HttpRequest parser;
 };
 
 struct		ListenSocket

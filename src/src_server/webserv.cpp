@@ -1,4 +1,6 @@
 #include "../../inc/inc_server/Webserv.hpp"
+#include "../../pedro/inc/HttpResponse.hpp"
+#include "../../pedro/inc/RequestHandler.hpp"
 #include <iostream>
 #include <cstring>
 #include <cerrno>
@@ -222,16 +224,6 @@ void Webserv::acceptAll(int listen_fd){
 	}
 }
 
-/* static std::string resolveString(int const &status_code, std::string const &reasonPhrase, std::map<std::string, std::string> const &headers, std::string const &body){
-	std::ostringstream oss;
-	oss << "HTTP/1.1 " << status_code << " " << reasonPhrase << "\r\n";
-	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); it++)
-		oss << it->first << ":" << it->second << "\r\n";
-	oss << "\r\n";
-	oss << body;
-	return (oss.str());
-} */
-
 void Webserv::handleClientRead(int fd){
 	std::map<int, Client>::iterator it = _clients.find(fd);
 	if (it == _clients.end())
@@ -255,12 +247,20 @@ void Webserv::handleClientRead(int fd){
 			return;
 		}
 	}
-	/* while (true){
-		HttpRequest result = client.parse.parser(client.in, client.expected_body);
+	while (true){
+		client.parser.parseRequest(client.in, client.expected_body);
+		if (client.parser.getStatus() == HttpRequest::Incomplete)
+			break;
+		else if (client.parser.getStatus() == HttpRequest::Complete){
+			HttpResponse resp = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
+			client.in.erase(client.parser.getRequestSize());
+			client.out = resp.toString();
+			
+		}
 		//agora checkar se incomplete error ou done
 		//se error chamar buildresponse
 		
-	} */
+	}
 }
 
 void Webserv::handleClientWrite(int fd){
