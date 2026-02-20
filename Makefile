@@ -1,10 +1,16 @@
 NAME = webserv
 
-SRCS = src/src_conf_pars/ParseConfig.cpp src/src_conf_pars/Parser.cpp \
-src/src_conf_pars/testConfig.cpp src/src_conf_pars/Tokenizer.cpp \
-src/src_conf_pars/ValidateConfig.cpp \
-src/main.cpp \
-src/src_server/webserv.cpp \
+#src/request/CGIHandler.cpp \#
+SRCS = src/config/ParseConfig.cpp src/config/Parser.cpp \
+src/config/testConfig.cpp src/config/Tokenizer.cpp \
+src/config/ValidateConfig.cpp src/config/ServerConfig.cpp \
+src/config/LocationConfig.cpp \
+src/server/webserv.cpp \
+src/internal/FileService.cpp \
+src/request/HttpRequest.cpp src/request/RequestHandler.cpp \
+src/response/HttpResponse.cpp src/response/ResponseBuilder.cpp \
+src/response/Mime.cpp \
+src/main.cpp
 
 OBJ_DIR = obj
 OBJS = $(addprefix $(OBJ_DIR)/, $(SRCS:.cpp=.o))
