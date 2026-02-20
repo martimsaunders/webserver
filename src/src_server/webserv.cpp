@@ -1,6 +1,7 @@
 #include "../../inc/inc_server/Webserv.hpp"
 #include "../../pedro/inc/HttpResponse.hpp"
 #include "../../pedro/inc/RequestHandler.hpp"
+#include "../../pedro/inc/ResponseBuilder.hpp"
 #include <iostream>
 #include <cstring>
 #include <cerrno>
@@ -253,9 +254,12 @@ void Webserv::handleClientRead(int fd){
 			break;
 		else if (client.parser.getStatus() == HttpRequest::Complete){
 			HttpResponse resp = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
-			client.in.erase(client.parser.getRequestSize());
+			client.in.erase(0, client.parser.getRequestSize());
 			client.out = resp.toString();
-			
+		}
+		else{
+			ResponseBuilder::buildErrorResponse(client.parser.getStatusCode(), _config.servers[client.server_index]);
+			client.should_close = true;
 		}
 		//agora checkar se incomplete error ou done
 		//se error chamar buildresponse
