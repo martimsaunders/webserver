@@ -1,12 +1,10 @@
 /*
-TODO:
-need headers trimmed and in lowercase from parsing - DONE
-is serverconfig index file a name or path? - DONE
-introduce allowed methods in post/delete - DONE
-post only with uploadpath or uri sensitive (at least !eisdir) - DONE
-status code visual map 
-path parsing coming from http (igonre query strings, ...) 
+TODO before cgi:
+post only with uploadpath or uri sensitive (!eisdir - Done)?
+complete posts only (directory only, no file override)?
+path parsing coming from http (igonre query strings, ...)
 introduce response constraints (maxlength, ...)
+status code visual map 
 */
 
 #include "../../inc/request/RequestHandler.hpp"
@@ -132,23 +130,36 @@ HttpResponse RequestHandler::handleGet(const Location* location,
 {
     if (info.isDirectory)
     {
-        // Index precedence: location -> server -> hardcoded default.
-		std::string indexFile = location->index;
-		if (indexFile.empty())
-			indexFile = serverConfig.index;
-		if (indexFile.empty())
-    		indexFile = "index.html";
+        // Index candidates precedence: location -> server -> hardcoded default.
+        std::vector<std::string> indexCandidates;
+        if (!location->index.empty())
+            indexCandidates.push_back(location->index);
+        if (!serverConfig.index.empty() && serverConfig.index != location->index)
+            indexCandidates.push_back(serverConfig.index);
+        if (indexCandidates.empty() || indexCandidates.back() != "index.html")
+            indexCandidates.push_back("index.html");
 
-		// Always search index in the resolved request directory.
-		std::string indexPath = joinPath(path, indexFile);
-		FileInfo indexInfo = FileService::getFileInfo(indexPath);
-		if (indexInfo.status == FILE_OK && indexInfo.isRegularFile)
-		{
-			std::string body;
-			if (!FileService::readFile(indexPath, body))
-				return ResponseBuilder::buildErrorResponse(403, serverConfig);
-			return ResponseBuilder::buildFileResponse(body, indexPath);
-		}
+        // Search candidates in the resolved request directory.
+        for (std::vector<std::string>::const_iterator it = indexCandidates.begin();
+             it != indexCandidates.end(); ++it)
+        {
+            std::string indexPath = joinPath(path, *it);
+            FileInfo indexInfo = FileService::getFileInfo(indexPath);
+
+            if (indexInfo.status == FILE_NOT_FOUND)
+                continue;
+            if (indexInfo.status == FILE_FORBIDDEN)
+                return ResponseBuilder::buildErrorResponse(403, serverConfig);
+            if (indexInfo.status != FILE_OK)
+                return ResponseBuilder::buildErrorResponse(indexInfo, serverConfig);
+            if (!indexInfo.isRegularFile)
+                continue;
+
+            std::string body;
+            if (!FileService::readFile(indexPath, body))
+                return ResponseBuilder::buildErrorResponse(403, serverConfig);
+            return ResponseBuilder::buildFileResponse(body, indexPath);
+        }
 
 		// No usable index -> optional autoindex.
 		if (location->autoindex)

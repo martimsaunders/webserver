@@ -1,0 +1,37 @@
+- no location matched URI -> 404 Not Found
+- parsed method is unknown (GET/POST/DELETE mismatch) -> 405 Method Not Allowed
+- method not allowed by location flags -> 405 Method Not Allowed
+- location has redirect configured -> redirect response (status from redirect config, typically 302)
+- resolved path is unsafe/invalid (empty) -> 403 Forbidden
+- filesystem lookup for resolved path failed -> mapped file error
+	- FILE_NOT_FOUND -> 404 Not Found
+	- FILE_FORBIDDEN -> 403 Forbidden
+	- other file error -> 500 Internal Server Error
+
+- method switch enters GET -> handleGet(...)
+	- target is directory
+		- search vector of candidate index files (location -> server -> hardcoded)
+			- resolved index file does not exist -> try next 
+			- resolved index exists as regular file, but reading index fails -> 403 Forbidden
+			- resolved index exists as regular file, and reading succeeds -> 200 OK
+		- no usable index, autoindex enabled, directory listing fails -> 403 Forbidden
+		- no usable index, autoindex enabled, directory listing succeeds -> 200 OK
+		- no usable index, autoindex disabled -> 403 Forbidden
+	- target is regular file
+		- reading file fails -> 403 Forbidden
+		- reading file succeeds -> 200 OK
+
+- method switch enters POST -> handlePost(...)
+	- upload disabled in location -> 403 Forbidden
+	- upload path not configured -> 500 Internal Server Error
+	- upload path invalid/not directory/not writable -> 500 Internal Server Error
+	- URI does not resolve to directory -> 404 Not Found
+	- write uploaded file fails -> 500 Internal Server Error
+	- write uploaded file succeeds -> 201 Created
+
+- method switch enters DELETE -> handleDelete(...)
+	- target not writable -> 403 Forbidden
+	- delete operation fails -> 500 Internal Server Error
+	- delete operation succeeds -> 200 OK
+
+- method switch default case (unexpected enum path) -> 405 Method Not Allowed
