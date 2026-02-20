@@ -1,11 +1,10 @@
 /*
 TODO:
-inherit root from global - DONE
-do autoindex and redirect? (change codes) - DONE
 need headers trimmed and in lowercase from parsing - DONE
 is serverconfig index file a name or path? - DONE
 introduce allowed methods in post/delete - DONE
 post only with uploadpath or uri sensitive (at least !eisdir) - DONE
+status code visual map 
 path parsing coming from http (igonre query strings, ...) 
 introduce response constraints (maxlength, ...)
 */
@@ -133,33 +132,22 @@ HttpResponse RequestHandler::handleGet(const Location* location,
 {
     if (info.isDirectory)
     {
-        // Effective index precedence: location / server -> hardcoded default.
+        // Index precedence: location -> server -> hardcoded default.
 		std::string indexFile = location->index;
+		if (indexFile.empty())
+			indexFile = serverConfig.index;
 		if (indexFile.empty())
     		indexFile = "index.html";
 
-		// search in location
-		std::string locationIndexPath = location->root + "/" + indexFile;
-		FileInfo indexInfo = FileService::getFileInfo(locationIndexPath);
-		// If index exists and is a file, serve it.
+		// Always search index in the resolved request directory.
+		std::string indexPath = joinPath(path, indexFile);
+		FileInfo indexInfo = FileService::getFileInfo(indexPath);
 		if (indexInfo.status == FILE_OK && indexInfo.isRegularFile)
 		{
 			std::string body;
-			if (!FileService::readFile(locationIndexPath, body))
+			if (!FileService::readFile(indexPath, body))
 				return ResponseBuilder::buildErrorResponse(403, serverConfig);
-			return ResponseBuilder::buildFileResponse(body, locationIndexPath);
-		}
-
-		// search in server root
-		std::string serverIndexPath = location->root + "/" + indexFile;
-		FileInfo serverIndexInfo = FileService::getFileInfo(serverIndexPath);
-		// If index exists and is a file, serve it.
-		if (serverIndexInfo.status == FILE_OK && serverIndexInfo.isRegularFile)
-		{
-			std::string body;
-			if (!FileService::readFile(serverIndexPath, body))
-				return ResponseBuilder::buildErrorResponse(403, serverConfig);
-			return ResponseBuilder::buildFileResponse(body, serverIndexPath);
+			return ResponseBuilder::buildFileResponse(body, indexPath);
 		}
 
 		// No usable index -> optional autoindex.
