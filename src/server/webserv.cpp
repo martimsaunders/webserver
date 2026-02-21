@@ -1,4 +1,7 @@
 #include "../../inc/server/Webserv.hpp"
+#include "../../inc/request/RequestHandler.hpp"
+#include "../../inc/response/HttpResponse.hpp"
+#include "../../inc/response/ResponseBuilder.hpp"
 #include <iostream>
 #include <cstring>
 #include <cerrno>
@@ -9,7 +12,23 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sstream>
+#include <set>
+#include <csignal>
+#include <ctime>
 
+#define WRITE_STALL_TICKS 10
+#define CONNECT_IDLE_TICKS 15
+#define HEADER_TIMEOUT_TICKS 10
+#define KEEPALIVE_TICKS 30
+
+static volatile sig_atomic_t g_stop = 0;
+static unsigned long g_tick = 0;
+
+static void handleStopSignal(int){
+	g_stop = 1;
+}
+
+//constructors e destructor
 Webserv::Webserv(Config const &config): _config(config){}
 
 Webserv::Webserv(Webserv const &other): _config(other._config), _pfds(other._pfds), _listens(other._listens), _clients(other._clients){}
@@ -28,7 +47,29 @@ Webserv::~Webserv(){
 	closeAll();
 }
 
+//helper functions
+static int setNonBlocking(int fd){
+	int flags = fcntl(fd, F_GETFL, 0);
+	if (flags == -1) return (-1);
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) return (-1);
+	return (0);
+}
+
+static std::string toString(int port){
+	std::ostringstream oss;
+	oss << port;
+	return (oss.str());
+}
+
+
+
+//member functions
 void Webserv::run(){
+	std::signal(SIGINT, handleStopSignal);
+	std::signal(SIGTERM, handleStopSignal);
+	std::signal(SIGQUIT, handleStopSignal);
+	std::signal(SIGPIPE, SIG_IGN);
+	std::signal(SIGTSTP, SIG_IGN);
 	setupListening();
 	eventLoop();
 }
@@ -70,19 +111,6 @@ void Webserv::setupListening(){
 
 bool Webserv::isListenFd(int fd) const{
 	return (_listens.find(fd) != _listens.end());
-}
-
-static int setNonBlocking(int fd){
-	int flags = fcntl(fd, F_GETFL, 0);
-	if (flags == -1) return (-1);
-	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) return (-1);
-	return (0);
-}
-
-static std::string toString(int port){
-	std::ostringstream oss;
-	oss << port;
-	return (oss.str());
 }
 
 int Webserv::createListenFd(std::string const &host, int port){
@@ -151,15 +179,44 @@ void Webserv::closeAll(){
 
 void Webserv::eventLoop(){
 	while (true){
+		if (g_stop){
+			closeAll();
+			std::cout << "Shutting down server gracefully..." << std::endl;
+			return;
+		}
 		if (_pfds.empty())
 			throw std::runtime_error("no fds to poll()");
 		int rc = poll(&_pfds[0], _pfds.size(), 1000);
+		++g_tick;
 		if (rc < 0){
 			if (errno == EINTR)
 				continue;
 			throw std::runtime_error("poll() failed");
 		}
-		std::vector<int> toRemove;
+		std::set<int> toRemove;
+		std::set<int> toRemoveListens;
+		for (std::map<int, Client>::iterator cit = _clients.begin(); cit != _clients.end(); cit++){
+			Client &c = cit->second;
+			if (!c.out.empty() && (g_tick - c.las_write_progress_tick) > WRITE_STALL_TICKS){
+				toRemove.insert(cit->first);
+				continue;
+			}
+			if (!c.in.empty() && c.out.empty()){
+				if ((g_tick - c.las_activity_tick) > HEADER_TIMEOUT_TICKS)
+					toRemove.insert(cit->first);
+				continue;
+			}
+			if (c.in.empty() && c.out.empty()){
+				if (!c.has_completed_request){
+					if ((g_tick - c.las_activity_tick) > CONNECT_IDLE_TICKS)
+						toRemove.insert(cit->first);
+				}
+				else{
+					if ((g_tick - c.las_activity_tick) > KEEPALIVE_TICKS)
+						toRemove.insert(cit->first);
+				}
+			}
+		}
 		size_t n = _pfds.size();
 		for (size_t i = 0; i < n; i++){
 			int fd = _pfds[i].fd;
@@ -167,26 +224,42 @@ void Webserv::eventLoop(){
 			if (re == 0)
 				continue;
 			if (isListenFd(fd)){
+				if (re & (POLLHUP | POLLERR | POLLNVAL)){
+					toRemoveListens.insert(fd);
+					continue;
+				}
 				if (re & POLLIN)
 					acceptAll(fd);
 			}
 			else{
+				if (re & (POLLHUP | POLLERR | POLLNVAL)){
+					toRemove.insert(fd);
+					continue;
+				}
 				if (re & POLLIN)
 					handleClientRead(fd);
 				std::map<int , Client>::iterator it = _clients.find(fd);
-				if (it != _clients.end() && it->second.should_close){
-					toRemove.push_back(fd);
+				if (it != _clients.end() && it->second.should_close && it->second.out.empty()){
+					toRemove.insert(fd);
 					continue;
 				}
 				if (re & POLLOUT)
 					handleClientWrite(fd);
 				it = _clients.find(fd);
-				if (it != _clients.end() && it->second.should_close)
-					toRemove.push_back(fd);
+				if (it != _clients.end() && it->second.should_close && it->second.out.empty())
+					toRemove.insert(fd);
 			}
 		}
-		for (size_t j = 0; j < toRemove.size(); j++)
-			removeClient(toRemove[j]);
+		for (std::set<int>::iterator it = toRemove.begin(); it != toRemove.end(); it++)
+			removeClient(*it);
+		for (std::set<int>::iterator it = toRemoveListens.begin(); it != toRemoveListens.end(); it++){
+			removeListen(*it);
+			std::cout << "Closed listen_fd=" << *it << std::endl;
+			if (_listens.empty()){
+				closeAll();
+				throw std::runtime_error("all listen sockets failed");
+			}
+		}
 	}
 }
 
@@ -197,78 +270,155 @@ void Webserv::acceptAll(int listen_fd){
 		socklen_t client_len = sizeof(client);
 		int client_fd = accept(listen_fd, reinterpret_cast<sockaddr*>(&client), &client_len);
 		if (client_fd < 0){
+			if (errno == EINTR)
+				continue;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				return;
-			throw std::runtime_error("accept() failed");
+			std::cerr << "accept() failed on listen_fd=" << listen_fd << std::endl;
+			return;
 		}
-		if (setNonBlocking(client_fd) < 0)
-			throw std::runtime_error("fcntl(O_NONBLOCK) failed");
+		if (setNonBlocking(client_fd) < 0){
+			close(client_fd);
+			continue;
+		}
+		std::map<int, ListenSocket>::iterator it =_listens.find(listen_fd);
+		if (it == _listens.end()){
+			close(client_fd);
+			return;
+		}
 		Client c;
 		c.fd = client_fd;
 		c.listen_fd = listen_fd;
 		c.want_write = false;
 		c.should_close = false;
 		c.header_parsed = false;
-		c.expected_body = 0;
-		std::map<int, ListenSocket>::iterator it =_listens.find(listen_fd);
-		if (it == _listens.end()){
-			close(client_fd);
-			throw std::runtime_error("internal error: accept on unknown listen_fd");
-		}
+		c.has_completed_request = false;
+		c.las_activity_tick = g_tick;
+		c.las_write_progress_tick = g_tick;
 		c.server_index = it->second.server_index;
+		c.expected_body = _config.servers[c.server_index].client_max_body_size;
 		_clients[client_fd] = c;
 		addPollFd(client_fd, POLLIN); 
 		std::cout << "Accepted client fd=" << client_fd << " on listen_fd=" << listen_fd << std::endl;
 	}
 }
 
-/* static std::string resolveString(int const &status_code, std::string const &reasonPhrase, std::map<std::string, std::string> const &headers, std::string const &body){
-	std::ostringstream oss;
-	oss << "HTTP/1.1 " << status_code << " " << reasonPhrase << "\r\n";
-	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); it++)
-		oss << it->first << ":" << it->second << "\r\n";
-	oss << "\r\n";
-	oss << body;
-	return (oss.str());
-} */
+void Webserv::setPollEvents(int fd, short event){
+	for (size_t i = 0; i < _pfds.size(); i++){
+		if (_pfds[i].fd == fd){
+			_pfds[i].events = event;
+			return ;
+		}
+	}
+}
 
 void Webserv::handleClientRead(int fd){
 	std::map<int, Client>::iterator it = _clients.find(fd);
 	if (it == _clients.end())
 		return;
 	Client &client = it->second;
+	if (!client.out.empty())
+		return ;
 	char temp[4096];
-	while (true){
-		ssize_t len = recv(fd, temp, sizeof(temp), 0);
-		if (len > 0)
-			client.in.append(temp, len);
-		else if (len == 0){
-			client.should_close = true;
-			return ;
-		}
-		else{
-			if (errno == EINTR)
-				continue;
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				break;
-			client.should_close = true;
-			return;
-		}
+	ssize_t len = recv(fd, temp, sizeof(temp), 0);
+	if (len > 0){
+		client.in.append(temp, len);
+		client.las_activity_tick = g_tick;
 	}
-	/* while (true){
-		HttpRequest result = client.parse.parser(client.in, client.expected_body);
-		//agora checkar se incomplete error ou done
-		//se error chamar buildresponse
-		
-	} */
+	else if (len == 0){
+		client.should_close = true;
+		return ;
+	}
+	else{
+		return;
+	}
+	client.parser.parseRequest(client.in, client.expected_body);
+	if (client.parser.getStatus() == HttpRequest::Incomplete)
+		return;
+	else if (client.parser.getStatus() == HttpRequest::Complete){
+		HttpResponse resp = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
+		client.in.erase(0, client.parser.getRequestSize());
+		client.out = resp.toString();
+		client.las_write_progress_tick = g_tick;
+		client.has_completed_request = true;
+		setPollEvents(fd, POLLOUT);
+		client.parser = HttpRequest();
+		return ;
+	}
+	HttpResponse err = ResponseBuilder::buildErrorResponse(client.parser.getStatusCode(), _config.servers[client.server_index]);
+	client.out = err.toString();
+	client.should_close = true;
+	client.las_write_progress_tick = g_tick;
+	client.has_completed_request = true;
+	setPollEvents(fd, POLLOUT);
+	client.parser = HttpRequest();
 }
 
 void Webserv::handleClientWrite(int fd){
-	(void) fd;
+	std::map<int, Client>::iterator it = _clients.find(fd);
+	if (it == _clients.end())
+		return;
+	Client &client = it->second;
+	if (client.out.empty()){
+		setPollEvents(fd, POLLIN);
+		return ;
+	}
+	ssize_t sent = send(fd, client.out.data(), client.out.size(), 0);
+	if (sent > 0){
+		client.out.erase(0, sent);
+		client.las_write_progress_tick = g_tick;
+		client.las_activity_tick = g_tick;
+	}
+	else {
+		setPollEvents(fd, POLLOUT);
+		return ;
+	}
+	if (!client.out.empty()){
+		setPollEvents(fd, POLLOUT);
+		return ;
+	}
+	if (client.should_close)
+		return;
+	setPollEvents(fd, POLLIN);
+	if (!client.in.empty()){
+		client.parser.parseRequest(client.in, client.expected_body);
+		if (client.parser.getStatus() == HttpRequest::Incomplete)
+			return;
+		else if (client.parser.getStatus() == HttpRequest::Complete){
+			HttpResponse resp = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
+			client.in.erase(0, client.parser.getRequestSize());
+			client.out = resp.toString();
+			client.las_write_progress_tick = g_tick;
+			setPollEvents(fd, POLLOUT);
+			client.parser = HttpRequest();
+			return ;
+		}
+		HttpResponse err = ResponseBuilder::buildErrorResponse(client.parser.getStatusCode(), _config.servers[client.server_index]);
+		client.out = err.toString();
+		client.should_close = true;
+		client.las_write_progress_tick = g_tick;
+		setPollEvents(fd, POLLOUT);
+		client.parser = HttpRequest();
+	}
 }
 
 void Webserv::removeClient(int fd){
+	int listen_fd = -1;
+	std::map<int, Client>::iterator it = _clients.find(fd);
+	if (it != _clients.end())
+		listen_fd = it->second.listen_fd;
 	delPollFd(fd);
 	close(fd);
-	_clients.erase(fd);
+	if (it != _clients.end())
+		_clients.erase(it);
+	std::cout << "Close client fd=" << fd;
+	if (listen_fd != -1)
+		std::cout << " on listen_fd=" << listen_fd;
+	std::cout << std::endl;
+}
+
+void Webserv::removeListen(int fd){
+	delPollFd(fd);
+	close(fd);
+	_listens.erase(fd);
 }

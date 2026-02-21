@@ -25,6 +25,6 @@ Config createConfig(std::string const &path){
 		Config cfg;
 		cfg = p.parseconfig();
 		validateConfig(cfg);
-		debugPrintConfig(cfg);
+		//debugPrintConfig(cfg);
 		return (cfg);
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include "../request/HttpRequest.hpp"
 
 struct		Client
 {
@@ -8,10 +9,15 @@ struct		Client
 	bool	want_write;
 	bool	should_close;
 	bool	header_parsed;
+	bool	has_completed_request;
 	size_t	server_index;
 	size_t	expected_body;
 	std::string in;
 	std::string out;
+	HttpRequest parser;
+	unsigned long las_activity_tick;
+	unsigned long las_write_progress_tick;
+
 };
 
 struct		ListenSocket

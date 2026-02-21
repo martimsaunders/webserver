@@ -35,4 +35,6 @@ class Webserv
 		void handleClientRead(int fd);
 		void handleClientWrite(int fd);
 		void removeClient(int fd);
+		void removeListen(int fd);
+		void setPollEvents(int fd, short event);
 };

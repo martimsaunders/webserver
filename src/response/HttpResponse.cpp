@@ -1,4 +1,5 @@
 #include "../../inc/response/HttpResponse.hpp"
+#include <sstream>
 
 HttpResponse::HttpResponse() : statusCode(200), body("") {}
 
@@ -18,9 +19,11 @@ void HttpResponse::setBody(const std::string& content) { body = content; }
 std::string HttpResponse::toString(){
     std::string str;
 
-    for(std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); it++){
-        str.append(it->first + " " + it->second + "\r\n");
-    }
-    str.append("\r\n" + body);
-    return str;
+    std::ostringstream oss;
+	oss << "HTTP/1.1 " << statusCode << " " << reasonPhrase << "\r\n";
+	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); it++)
+		oss << it->first << ": " << it->second << "\r\n";
+	oss << "\r\n";
+	oss << body;
+	return (oss.str());
 }
