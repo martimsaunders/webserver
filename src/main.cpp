@@ -2,7 +2,10 @@
 #include "../inc/server/Webserv.hpp"
 
 int main(int argc, char **argv){
-	(void)argc;
+	if (argc != 2){
+		std::cerr << "./webserv <config_file>" << std::endl;
+		return (1);
+	}
 	try{
 		Config cfg = createConfig(argv[1]);
 		Webserv wbs(cfg);

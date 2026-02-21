@@ -16,7 +16,7 @@ OBJ_DIR = obj
 OBJS = $(addprefix $(OBJ_DIR)/, $(SRCS:.cpp=.o))
 
 CPP = c++
-CPPFLAGS = -std=c++98 #-Wall -Wextra -Werror -std=c++98 -g -Iinc
+CPPFLAGS = -Wall -Wextra -Werror -std=c++98 -g -Iinc
 
 GREEN = \033[0;32m
 BLUE = \033[0;34m
