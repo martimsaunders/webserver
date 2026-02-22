@@ -43,13 +43,25 @@ std::string ResponseBuilder::resolveReasonPhrase(int statusCode)
     {
         case 200: return "OK";
         case 201: return "Created";
+        case 202: return "Accepted";
+        case 204: return "No Content";
+        case 206: return "Partial Content";
+        case 300: return "Multiple Choices";
+		case 301: return "Moved Permanently";
+		case 302: return "Found";
+        case 303: return "See Other";
+        case 304: return "Not Modified";
+        case 307: return "Temporary Redirect";
+        case 308: return "Permanent Redirect";
         case 400: return "Bad Request";
         case 403: return "Forbidden";
         case 404: return "Not Found";
         case 405: return "Method Not Allowed";
+        case 409: return "Conflict";
         case 413: return "Payload Too Large";
+		case 414: return "URI Too Long";
         case 500: return "Internal Server Error";
-        default:  return "Unknown";
+        default:  return "Unknown Status";
     }
 }
 
@@ -139,9 +151,9 @@ HttpResponse ResponseBuilder::buildFileResponse(const std::string& fileContent, 
 HttpResponse ResponseBuilder::buildAutoindexResponse(const std::string& path, const std::vector<std::string>& entries)
 {
 	std::ostringstream body;
-    body << "<html>\n\t<body>\n\t\t<h1>Index of " << path << "</h1>\n\t\t<ul>";
+    body << "<html><body><h1>Index of " << path << "</h1><ul>";
     for (size_t i = 0; i < entries.size(); ++i)
-        body << "\n\t\t\t<li>" << escapeHtml(entries[i]) << "</li>";
-    body << "\n\t\t</ul>\n\t</body>\n</html>";
+        body << "<li>" << escapeHtml(entries[i]) << "</li>";
+    body << "</ul></body></html>";
     return buildSimpleResponse(200, body.str(), "text/html");
 }

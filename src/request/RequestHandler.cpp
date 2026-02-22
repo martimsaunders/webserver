@@ -211,7 +211,7 @@ HttpResponse RequestHandler::handlePost(const Location* location,
 
 	//if uri is not directory
 	if (!info.isDirectory)
-		return ResponseBuilder::buildErrorResponse(404, serverConfig);
+		return ResponseBuilder::buildErrorResponse(409, serverConfig);
 
 	//find filename or build (to create full path)
     std::string extension = request.extensionFromContentType();
@@ -243,6 +243,11 @@ HttpResponse RequestHandler::handleDelete(const Location* location,
                                           const ServerConfig& serverConfig)
 {
 	(void) location;
+	(void) path;
+
+	// deleting directories is not supported in this route
+	if (info.isDirectory)
+		return ResponseBuilder::buildErrorResponse(409, serverConfig);
 
 	// if not writable no permission (403)
     if (!info.writable)
