@@ -11,9 +11,11 @@
 - method switch enters GET -> handleGet(...)
 	- target is directory
 		- search vector of candidate index files (location -> server -> hardcoded)
-			- resolved index file does not exist -> try next 
-			- resolved index exists as regular file, but reading index fails -> 403 Forbidden
-			- resolved index exists as regular file, and reading succeeds -> 200 OK
+			- status = FILE_NOT_FOUND -> try next
+			- status = FILE_FORBIDDEN -> 403 Forbidden
+			- status = FILE_ERROR -> 500 Internal Se3rver Error
+			- !regularFile (directory) -> try next 
+			- index exists as regular file, and reading succeeds -> 200 OK
 		- no usable index, autoindex enabled, directory listing fails -> 403 Forbidden
 		- no usable index, autoindex enabled, directory listing succeeds -> 200 OK
 		- no usable index, autoindex disabled -> 403 Forbidden
