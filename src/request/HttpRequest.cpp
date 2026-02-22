@@ -1,23 +1,36 @@
 #include "../../inc/request/HttpRequest.hpp"
 
-HttpRequest::HttpRequest() : method(""), uri(""), version(""), headers(), body(""), errorMsg(""), 
-statusCode(0), requestSize(0), status(Parsing), state(ReadingStartLine) {}
+HttpRequest::HttpRequest() : method(""), uri(""), uriPath(""), queryString(""), host(""), version(""), headers(), body(""), errorMsg(""), 
+statusCode(0), requestSize(0), status(Parsing), state(ReadingStartLine),
+isMultipart(false), boundary(""), file() {}
 	
 // Getters
 std::string HttpRequest::getMethod() const { return method; }
 std::string HttpRequest::getUri() const { return uri; }
+std::string HttpRequest::getUriPath() const { return uriPath; }
+std::string HttpRequest::getQueryString() const { return queryString; }
+std::string HttpRequest::getHost() const { return host; }
 std::string HttpRequest::getVersion() const { return version; }
 std::string HttpRequest::getBody() const { return body; }
 HttpRequest::ParseStatus HttpRequest::getStatus() const { return status; }
 int HttpRequest::getStatusCode() const { return statusCode; }
 int HttpRequest::getRequestSize() const { return requestSize; }
+const MultipartFile& HttpRequest::getMultipartFile() const { return file; }
+bool HttpRequest::getIsMultipart() const { return isMultipart; }
+const std::string& HttpRequest::getBoundary() const { return boundary; }
 
 //Setters
 void HttpRequest::setMethod(const std::string& m) { method = m; }
 void HttpRequest::setUri(const std::string& u) { uri = u; }
+void HttpRequest::setUriPath(const std::string& p) { uriPath = p; }
+void HttpRequest::setQueryString(const std::string& q) { queryString = q; }
+void HttpRequest::setHost(const std::string& h) { host = h; }
 void HttpRequest::setVersion(const std::string& v) { version = v; }
 void HttpRequest::addHeader(const std::string& key, const std::string& value) {  headers[key] = value; }
 void HttpRequest::setBody(const std::string& b) { body = b; }
+void HttpRequest::setIsMultipart(bool value) { isMultipart = value; }
+void HttpRequest::setBoundary(const std::string& value) { boundary = value; }
+void HttpRequest::setMultipartFile(const MultipartFile& value) { file = value; }
 
 std::vector<std::string> HttpRequest::split(std::string str, const std::string& c){
     std::vector<std::string> split;

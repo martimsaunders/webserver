@@ -1,6 +1,6 @@
 /*
 TODO before cgi:
-path parsing coming from http (igonre query strings, ...)
+path parsing coming from http (split query string, invalid chars(400), traversal(400))
 introduce response constraints (maxlength, ...)
 status code visual map 
 */
@@ -212,8 +212,20 @@ HttpResponse RequestHandler::handlePost(const Location* location,
 		return ResponseBuilder::buildErrorResponse(409, serverConfig);
 
 	//find filename or build (to create full path)
-    std::string extension = request.extensionFromContentType();
+    MultipartFile multipartFile = request.getMultipartFile();
+    std::string extension;
+    if (!multipartFile.contentType.empty())
+        extension = Mime::getExtension(multipartFile.contentType);
+    if (extension.empty())
+        extension = request.extensionFromContentType();
+
     std::string filename = request.filenameFromContentDisposition();
+    std::string bodyToWrite = request.getBody();
+    if (!multipartFile.filename.empty())
+    {
+        filename = multipartFile.filename;
+        bodyToWrite = multipartFile.data;
+    }
     std::string targetPath;
 	
 	//filename found (path + filename)
@@ -232,7 +244,7 @@ HttpResponse RequestHandler::handlePost(const Location* location,
 		return ResponseBuilder::buildErrorResponse(409, serverConfig);
 
 	//if write fails, return internal error (500)
-    if (!FileService::writeFile(targetPath, request.getBody()))
+    if (!FileService::writeFile(targetPath, bodyToWrite))
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
 
 	//return file created succesfully (201)

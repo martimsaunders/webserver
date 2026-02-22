@@ -13,7 +13,7 @@
 		- search vector of candidate index files (location -> server -> hardcoded)
 			- status = FILE_NOT_FOUND -> try next
 			- status = FILE_FORBIDDEN -> 403 Forbidden
-			- status = FILE_ERROR -> 500 Internal Se3rver Error
+			- status = FILE_ERROR -> 500 Internal Server Error
 			- !regularFile (directory) -> try next 
 			- index exists as regular file, and reading succeeds -> 200 OK
 		- no usable index, autoindex enabled, directory listing fails -> 403 Forbidden
@@ -28,6 +28,10 @@
 	- upload path not configured -> 500 Internal Server Error
 	- upload path invalid/not directory/not writable -> 500 Internal Server Error
 	- URI does not resolve to directory -> 409 Conflict
+	- choose upload payload source
+		- if multipart file exists -> filename/content-type/body come from multipart file part
+		- otherwise -> filename/content-type/body come from regular request headers/body
+	- target filename already exists -> 409 Conflict
 	- write uploaded file fails -> 500 Internal Server Error
 	- write uploaded file succeeds -> 201 Created
 
