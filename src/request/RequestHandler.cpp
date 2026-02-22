@@ -1,7 +1,5 @@
 /*
 TODO before cgi:
-post only with uploadpath or uri sensitive (!eisdir - Done)?
-complete posts only (directory only, no file override)?
 path parsing coming from http (igonre query strings, ...)
 introduce response constraints (maxlength, ...)
 status code visual map 
@@ -228,6 +226,10 @@ HttpResponse RequestHandler::handlePost(const Location* location,
 	//if no filename, build defaultName (path + defaultName)
     else
         targetPath = buildDefaultFilename(uploadPath, extension);
+
+	// avoid overwriting an existing file
+	if (FileService::pathExists(targetPath))
+		return ResponseBuilder::buildErrorResponse(409, serverConfig);
 
 	//if write fails, return internal error (500)
     if (!FileService::writeFile(targetPath, request.getBody()))

@@ -44,6 +44,12 @@ FileInfo FileService::getFileInfo(const std::string& path)
     return info;
 }
 
+bool FileService::pathExists(const std::string& path)
+{
+    struct stat buffer;
+    return stat(path.c_str(), &buffer) == 0;
+}
+
 bool FileService::readFile(const std::string& path, std::string& content)
 {
     std::ifstream file(path.c_str(), std::ios::in | std::ios::binary);

@@ -27,6 +27,7 @@ class FileService
 {
 	public:
 		static FileInfo getFileInfo(const std::string& path);
+		static bool pathExists(const std::string& path);
 		static bool readFile(const std::string& path, std::string& content);
 		static bool writeFile(const std::string& path, const std::string& content);
 		static bool deleteFile(const std::string& path);
