@@ -74,24 +74,25 @@ HttpResponse RequestHandler::handleRequest(const HttpRequest& request, const Ser
 
 	//reject if method not allowed (405)
     HttpMethod method = stringToMethod(request.getMethod());
-    if (method == UNKNOWN)
-        return ResponseBuilder::buildErrorResponse(405, serverConfig);
-	if (!checkMethod(method, *location))
-		return ResponseBuilder::buildErrorResponse(405, serverConfig);
+    if (method == UNKNOWN){
+        return ResponseBuilder::buildErrorResponse(405, serverConfig);}
+
+	if (!checkMethod(method, *location)){
+		return ResponseBuilder::buildErrorResponse(405, serverConfig);}
 
 	//override with redirect if in location block (302)
-    if (location->hasRedirect())
-        return ResponseBuilder::buildRedirectResponse(*location);
+    if (location->hasRedirect()){
+        return ResponseBuilder::buildRedirectResponse(*location);}
 
 	//reject unsafe path string (403)
     std::string fullPath = location->resolvePath(request.getUri());
-    if (fullPath.empty())
-        return ResponseBuilder::buildErrorResponse(403, serverConfig);
+    if (fullPath.empty()){
+        return ResponseBuilder::buildErrorResponse(403, serverConfig);}
 
 	//reject if not found (404) or forbidden(403), default to (500)
     FileInfo info = FileService::getFileInfo(fullPath); 
-    if (info.status != FILE_OK)
-        return ResponseBuilder::buildErrorResponse(info, serverConfig);
+    if (info.status != FILE_OK){
+        return ResponseBuilder::buildErrorResponse(info, serverConfig);}
 
     HttpResponse response;
     switch (method)
@@ -194,30 +195,30 @@ HttpResponse RequestHandler::handlePost(const Location* location,
     (void) info;
 
 	// reject if upload disabled, Forbidden (403)
-    if (!location->upload_enabled)
-        return ResponseBuilder::buildErrorResponse(403, serverConfig);
+    if (!location->upload_enabled){
+        return ResponseBuilder::buildErrorResponse(403, serverConfig);}
 
 	//upload path not configured, internal error (500)
     std::string uploadPath = location->upload_store;
-    if (uploadPath.empty())
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
+    if (uploadPath.empty()){
+        return ResponseBuilder::buildErrorResponse(500, serverConfig);}
 
 	//if upload path returns error, server misconfigured (500)
     FileInfo uploadDirInfo = FileService::getFileInfo(uploadPath);
-    if (uploadDirInfo.status != FILE_OK || !uploadDirInfo.isDirectory || !uploadDirInfo.writable)
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
+    if (uploadDirInfo.status != FILE_OK || !uploadDirInfo.isDirectory || !uploadDirInfo.writable){
+        return ResponseBuilder::buildErrorResponse(500, serverConfig);}
 
 	//if uri is not directory
-	if (!info.isDirectory)
-		return ResponseBuilder::buildErrorResponse(409, serverConfig);
+	if (!info.isDirectory){
+		return ResponseBuilder::buildErrorResponse(409, serverConfig);}
 
 	//find filename or build (to create full path)
     MultipartFile multipartFile = request.getMultipartFile();
     std::string extension;
-    if (!multipartFile.contentType.empty())
-        extension = Mime::getExtension(multipartFile.contentType);
-    if (extension.empty())
-        extension = request.extensionFromContentType();
+    if (!multipartFile.contentType.empty()){
+        extension = Mime::getExtension(multipartFile.contentType);}
+    if (extension.empty()){
+        extension = request.extensionFromContentType();}
 
     std::string filename = request.filenameFromContentDisposition();
     std::string bodyToWrite = request.getBody();
@@ -236,16 +237,16 @@ HttpResponse RequestHandler::handlePost(const Location* location,
         targetPath = joinPath(uploadPath, filename);
     }
 	//if no filename, build defaultName (path + defaultName)
-    else
-        targetPath = buildDefaultFilename(uploadPath, extension);
+    else{
+        targetPath = buildDefaultFilename(uploadPath, extension);}
 
 	// avoid overwriting an existing file
-	if (FileService::pathExists(targetPath))
-		return ResponseBuilder::buildErrorResponse(409, serverConfig);
+	if (FileService::pathExists(targetPath)){
+		return ResponseBuilder::buildErrorResponse(409, serverConfig);}
 
 	//if write fails, return internal error (500)
-    if (!FileService::writeFile(targetPath, bodyToWrite))
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
+    if (!FileService::writeFile(targetPath, bodyToWrite)){
+        return ResponseBuilder::buildErrorResponse(500, serverConfig);}
 
 	//return file created succesfully (201)
     return ResponseBuilder::buildSimpleResponse(201, "File uploaded successfully: " + targetPath, "text/plain");
@@ -260,16 +261,16 @@ HttpResponse RequestHandler::handleDelete(const Location* location,
 	(void) path;
 
 	// deleting directories is not supported in this route
-	if (info.isDirectory)
-		return ResponseBuilder::buildErrorResponse(409, serverConfig);
+	if (info.isDirectory){
+		return ResponseBuilder::buildErrorResponse(409, serverConfig);}
 
 	// if not writable no permission (403)
-    if (!info.writable)
-        return ResponseBuilder::buildErrorResponse(403, serverConfig);
+    if (!info.writable){
+        return ResponseBuilder::buildErrorResponse(403, serverConfig);}
 	
 	// Fallback for other runtime failures (EISDIR, I/O issues, etc.)
-	if (!FileService::deleteFile(path))
-    	return ResponseBuilder::buildErrorResponse(500, serverConfig);
+	if (!FileService::deleteFile(path)){
+    	return ResponseBuilder::buildErrorResponse(500, serverConfig);}
 
 	return ResponseBuilder::buildSimpleResponse(200, "Deleted successfully", "text/plain");    
 }

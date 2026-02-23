@@ -59,7 +59,7 @@ int HttpRequest::readStartLine(std::string& requestBuffer){
     if(pos == std::string::npos)
         return 1;
 
-    std::vector<std::string> startLine = split(requestBuffer.substr(0, pos), NEWLINE);
+    std::vector<std::string> startLine = split(requestBuffer.substr(0, pos), " ");
     requestBuffer.erase(0, pos + 2);
     this->requestSize += pos + 2;
 
@@ -95,6 +95,7 @@ int HttpRequest::readStartLine(std::string& requestBuffer){
     }
     this->setVersion(startLine[2]);
 
+    this->state = ReadingHeaders;
     return 0;
 }
 
@@ -113,26 +114,29 @@ int HttpRequest::readHeaders(std::string& requestBuffer){
     }
 
     std::vector<std::string> headersLine = split(requestBuffer.substr(0, pos), NEWLINE);
+
     if(headersLine.empty()){
         errorMsg = "Headers: Bad format, no new lines";
         return 400;
     }
+
     requestBuffer.erase(0, pos + 4);
     this->requestSize += pos + 4;
 
-    for(std::vector<std::string>::iterator it = headersLine.begin() + 1; it != headersLine.end(); it++){
+    for(std::vector<std::string>::iterator it = headersLine.begin(); it != headersLine.end(); it++){
 
-        std::vector<std::string> header = split(*it, " ");
+        std::vector<std::string> header = split(*it, ": ");
         //bad format
         if (header.size() != 2){
             errorMsg = "Header: Bad format";
             return 400;
         }
         //header delimiter check
-        if(std::count(header[0].begin(), header[0].end(), ':') != 1){
-            errorMsg = "Header: delimiter : error";
-            return 400;
-        }
+        // if(std::count(header[0].begin(), header[0].end(), ':') != 1){
+        //     errorMsg = "Header: delimiter : error";
+        //     return 400;
+        // }
+
         //invalid characters
         for(std::string::iterator i = header[0].begin(); i != header[0].end(); i++){
             if(!isalnum(*i) && *i != '-'){
@@ -149,18 +153,18 @@ int HttpRequest::readHeaders(std::string& requestBuffer){
         this->addHeader(header[0], header[1]);
     }
     //Host header missing
-    if(version == "HTTP/1.1" && !hasHeader("Host:")){
+    if(version == "HTTP/1.1" && !hasHeader("Host")){
         errorMsg = "Header: Host header missing";
         return 400;
     }
     //two body types presence
-    if(hasHeader("Transfer-Encoding:") && hasHeader("Content-Length:")){
+    if(hasHeader("Transfer-Encoding") && hasHeader("Content-Length")){
         errorMsg = "Header: Two body types";
         return 400;
     }
-    if(hasHeader("Content-Length:")){
+    if(hasHeader("Content-Length")){
         //non numeric Content-Length
-        std::map<std::string, std::string>::iterator v = headers.find("Content-Length:");
+        std::map<std::string, std::string>::iterator v = headers.find("Content-Length");
         for(size_t i = 0; i < v->second.length(); i++){
             if(!isdigit(v->second[i])){
                 errorMsg = "Header: Non numeris Content-Lenght value";
@@ -170,8 +174,10 @@ int HttpRequest::readHeaders(std::string& requestBuffer){
     }
     //duplicated headers
     for(std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); it++){
-        if(it->first == "Host:" || it->first == "Content-Length:" || it->first == "Transfer-Encoding:" || it->first == "Content-Type:"){
+        if(it->first == "Host" || it->first == "Content-Length" || it->first == "Transfer-Encoding" || it->first == "Content-Type"){
             for(std::map<std::string, std::string>::iterator it2 = headers.begin(); it2 != headers.end(); it2++){
+                if(it2 == it)
+                    continue;
                 if(it2->first == it->first){
                     errorMsg = "Header: Critical header duplicated";
                     return 400; 
@@ -182,12 +188,12 @@ int HttpRequest::readHeaders(std::string& requestBuffer){
 
     if(this->getMethod() == "POST"){
 
-        if(hasHeader("Content-Length:"))
+        if(hasHeader("Content-Length"))
             this->state = ReadingContentLengthBody;
-        else if(hasHeader("Transfer-Encoding:"))
+        else if(hasHeader("Transfer-Encoding"))
             this->state = ReadingChunkedBody;
         else{
-            errorMsg = "Header: Missing header";
+            errorMsg = "Header: Missing body info header";
             return 400;
         }
     }
@@ -198,11 +204,11 @@ int HttpRequest::readContentLengthBody(std::string& requestBuffer, size_t bodyMa
     if(this->state != ReadingContentLengthBody || this->statusCode != 0)
         return this->statusCode;
     
-    std::map<std::string, std::string>::const_iterator it = headers.find("Content-Length:");
+    std::map<std::string, std::string>::const_iterator it = headers.find("Content-Length");
     size_t bodySize = static_cast<size_t>(atoi(it->second.c_str()));
 
     if(bodySize > bodyMaxSize){
-        errorMsg = "Boddy: Body size too big";
+        errorMsg = "Body: Body size too big";
         return 413;
     }
     //incomplete request
@@ -224,7 +230,7 @@ int HttpRequest::readChunkedBody(std::string& requestBuffer, size_t bodyMaxSize)
         return 1;
     
     if(pos > bodyMaxSize){
-        errorMsg = "Boddy: Body size too big";
+        errorMsg = "Body: Body size too big";
         return 413;
     }
     this->setBody(requestBuffer.substr(0, pos));
@@ -242,7 +248,7 @@ void HttpRequest::parseRequest(const std::string& recvBuffer, size_t bodyMaxSize
     this->statusCode = readHeaders(requestBuffer);
     this->statusCode = readContentLengthBody(requestBuffer, bodyMaxSize);
     this->statusCode = readChunkedBody(requestBuffer, bodyMaxSize);
-
+    
     if(this->statusCode == 1)
         this->status = Incomplete;
     else if(this->statusCode == 0){
@@ -257,21 +263,22 @@ void HttpRequest::parseRequest(const std::string& recvBuffer, size_t bodyMaxSize
         headers.swap(loweredHeaders);
         this->status = Complete;
     }
-    else
+    else{
         this->status = Error;
+    }
 }
 
 void HttpRequest::printRequest(){
-    std::cout << "-------REQUEST-BEGIN--------" << std::endl;
+    std::cout << "\n-------REQUEST-BEGIN--------" << std::endl;
     std::cout << getMethod() << " " << getUri() << " " << getVersion() << std::endl;
 
     for(std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); it++){
-        std::cout << it->first << " " << it->second << std::endl;
+        std::cout << it->first << ": " << it->second << std::endl;
     }
 
     if(!getBody().empty())
         std::cout << getBody() << std::endl;
-    std::cout << "-------REQUEST-END--------" << std::endl;
+    std::cout << "-------REQUEST-END--------\n" << std::endl;
 }
 
 bool HttpRequest::hasHeader(const std::string& key) const
