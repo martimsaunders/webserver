@@ -74,12 +74,10 @@ HttpResponse RequestHandler::handleRequest(const HttpRequest& request, const Ser
 
 	//reject if method not allowed (405)
     HttpMethod method = stringToMethod(request.getMethod());
-    if (method == UNKNOWN)
+    if (method == UNKNOWN || !checkMethod(method, *location))
         return ResponseBuilder::buildErrorResponse(405, serverConfig);
-	if (!checkMethod(method, *location))
-		return ResponseBuilder::buildErrorResponse(405, serverConfig);
 
-	//override with redirect if in location block (302)
+	//override with redirect if in location block (dynamic code)
     if (location->hasRedirect())
         return ResponseBuilder::buildRedirectResponse(*location);
 
@@ -93,32 +91,24 @@ HttpResponse RequestHandler::handleRequest(const HttpRequest& request, const Ser
     if (info.status != FILE_OK)
         return ResponseBuilder::buildErrorResponse(info, serverConfig);
 
-    HttpResponse response;
-    switch (method)
-    {
-		//reject if invalid method (405)
-        case GET:
-            response = handleGet(location, fullPath, info, serverConfig);
-            break;
-        case POST:
-            response = handlePost(location, request, fullPath, info, serverConfig);
-            break;
-        case DELETE:
-            response = handleDelete(location, fullPath, info, serverConfig);
-            break;
-        default:
-            return ResponseBuilder::buildErrorResponse(405, serverConfig);
-    }
-
-    // Execute CGI if required
+	// Override if CGI endpoint
     if (location->isCgiRequest(request.getUri()))
     {
         // call CGIHandler to execute script and return response
     }
 
-    // Validate constraints (max body size, permissions, etc.)
-    // if violation → return ErrorResponseBuilder
-    return response;
+    switch (method)
+    {
+		//reject if invalid method (405)
+        case GET:
+            return handleGet(location, fullPath, info, serverConfig);
+        case POST:
+            return handlePost(location, request, fullPath, info, serverConfig);
+        case DELETE:
+            return handleDelete(location, fullPath, info, serverConfig);
+        default:
+            return ResponseBuilder::buildErrorResponse(405, serverConfig);
+    }
 }
 
 HttpResponse RequestHandler::handleGet(const Location* location,
