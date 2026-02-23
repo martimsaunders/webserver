@@ -90,6 +90,7 @@ class HttpRequest
 		int readHeaders(std::string& requestBuffer);
 		int readChunkedBody(std::string& requestBuffe, size_t bodyMaxSize);
 		int readContentLengthBody(std::string& requestBuffe, size_t bodyMaxSize);
+		int multipartParsing();
 };
 
 
