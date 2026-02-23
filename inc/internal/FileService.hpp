@@ -19,6 +19,7 @@ struct FileInfo
 	bool isRegularFile;
 	bool readable;
     bool writable;
+	bool executable;
 	off_t size;
 };
 

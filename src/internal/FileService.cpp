@@ -9,7 +9,7 @@
 
 FileInfo FileService::getFileInfo(const std::string& path)
 {
-    FileInfo info = {FILE_ERROR, false, false, false, false, 0};
+    FileInfo info = {FILE_ERROR, false, false, false, false, false, 0};
     struct stat buffer;
 
     // Try to stat the requested path
@@ -41,6 +41,8 @@ FileInfo FileService::getFileInfo(const std::string& path)
     if (access(path.c_str(), W_OK) == 0)
         info.writable = true;
 
+	if (access(path.c_str(), X_OK) == 0)
+		info.executable = true;
     return info;
 }
 
