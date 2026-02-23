@@ -7,6 +7,8 @@ std::map<std::string, std::string> Mime::createExtToMime()
     m["html"] = "text/html";
     m["htm"]  = "text/html";
     m["txt"]  = "text/plain";
+    m["css"]  = "text/css";
+    m["js"]   = "application/javascript";
     m["json"] = "application/json";
     m["xml"]  = "application/xml";
 
@@ -26,6 +28,9 @@ std::map<std::string, std::string> Mime::createMimeToExt()
 
     m["text/plain"] = ".txt";
     m["text/html"] = ".html";
+    m["text/css"] = ".css";
+    m["application/javascript"] = ".js";
+    m["text/javascript"] = ".js";
     m["application/json"] = ".json";
     m["application/xml"] = ".xml";
     m["text/xml"] = ".xml";
