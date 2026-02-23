@@ -212,7 +212,7 @@ HttpResponse RequestHandler::handlePost(const Location* location,
 		return ResponseBuilder::buildErrorResponse(409, serverConfig);
 
 	//find filename or build (to create full path)
-    MultipartFile multipartFile = request.getMultipartFile();
+    const MultipartFile &multipartFile = request.getMultipartFile();
     std::string extension;
     if (!multipartFile.contentType.empty())
         extension = Mime::getExtension(multipartFile.contentType);
