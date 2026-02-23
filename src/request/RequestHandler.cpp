@@ -1,8 +1,6 @@
 /*
 TODO before cgi:
 path parsing coming from http (split query string, invalid chars(400), traversal(400))
-introduce response constraints (maxlength, ...)
-status code visual map 
 */
 
 #include "../../inc/request/RequestHandler.hpp"
@@ -80,7 +78,7 @@ HttpResponse RequestHandler::handleRequest(const HttpRequest& request, const Ser
 	if (!checkMethod(method, *location)){
 		return ResponseBuilder::buildErrorResponse(405, serverConfig);}
 
-	//override with redirect if in location block (302)
+	//override with redirect if in location block (dynamic code)
     if (location->hasRedirect()){
         return ResponseBuilder::buildRedirectResponse(*location);}
 
