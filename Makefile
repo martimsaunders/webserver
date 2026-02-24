@@ -7,7 +7,7 @@ src/config/ValidateConfig.cpp src/config/ServerConfig.cpp \
 src/config/LocationConfig.cpp \
 src/server/webserv.cpp \
 src/internal/FileService.cpp \
-src/request/HttpRequest.cpp src/request/RequestHandler.cpp \
+src/request/HttpRequest.cpp src/request/RequestHandler.cpp src/request/requestParsing.cpp \
 src/response/HttpResponse.cpp src/response/ResponseBuilder.cpp \
 src/response/Mime.cpp \
 src/main.cpp

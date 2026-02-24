@@ -249,8 +249,8 @@ std::string HttpRequest::filenameFromContentDisposition() const
 }
 
 bool HttpRequest::detectMultipartAndBoundary(){
-    if(this->state != ReadingContentLengthBody || this->state != ReadingChunkedBody || this->statusCode != 0)
-        return this->statusCode;
+    if((this->state != ReadingContentLengthBody && this->state != ReadingChunkedBody) || this->statusCode != 0)
+        return false;
     
     std::string contentType;
     if(!tryGetHeader("content-type", contentType))
