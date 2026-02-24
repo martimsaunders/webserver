@@ -18,6 +18,15 @@ std::vector<std::string> HttpRequest::split(std::string str, const std::string& 
     return split;
 }
 
+static bool isUriChar(char c){
+    if(isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~'
+     || c == '!' || c == '$' || c == '&' || c == '\'' || c == '(' 
+     || c == ')' || c == '*' || c == '+' || c == ',' || c == ';' 
+     || c == '=' || c == ':' || c == '@' || c == '%' || c == '/' || c == '#')
+        return true;
+    return false;
+}
+
 int HttpRequest::readStartLine(std::string& requestBuffer){
     if(this->state != ReadingStartLine || this->statusCode != 0)
         return this->statusCode;
@@ -55,15 +64,32 @@ int HttpRequest::readStartLine(std::string& requestBuffer){
         return 414;
     }
     this->setUri(startLine[1]);
-
-    if(uri.find("?") != std::string::npos){
+    
+    size_t start = uri.find("?");
+    if(start != std::string::npos){
         if(std::count(uri.begin(), uri.end(), '?') > 1){
             errorMsg = "Uri: Multiple '?'";
             return 400;
         }
-        queryString = 
-    }
 
+        queryString = uri.substr(start + 1, uri.size() - start);
+        for(size_t i = 0; i < queryString.size(); i++){
+            if(!isUriChar(queryString[i])){
+                errorMsg = "Uri: Ivalid char";
+                return 400;
+            }
+        }
+        uriPath = uri.substr(0, start);
+    }
+    else
+        uriPath = uri;
+
+    for(size_t i = 0; i < uriPath.size(); i++){
+        if(!isUriChar(uriPath[i])){
+            errorMsg = "Uri: Ivalid char";
+            return 400;
+        }
+    }
 
     //invalid version/protocol
     if(startLine[2] != "HTTP/1.0" && startLine[2] != "HTTP/1.1"){
