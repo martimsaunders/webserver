@@ -12,6 +12,7 @@ std::string HttpRequest::getQueryString() const { return queryString; }
 std::string HttpRequest::getHost() const { return host; }
 std::string HttpRequest::getVersion() const { return version; }
 std::string HttpRequest::getBody() const { return body; }
+const std::map<std::string, std::string>& HttpRequest::getHeaders() const { return headers; }
 HttpRequest::ParseStatus HttpRequest::getStatus() const { return status; }
 int HttpRequest::getStatusCode() const { return statusCode; }
 int HttpRequest::getRequestSize() const { return requestSize; }

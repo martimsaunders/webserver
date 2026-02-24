@@ -60,7 +60,10 @@ std::string ResponseBuilder::resolveReasonPhrase(int statusCode)
         case 409: return "Conflict";
         case 413: return "Payload Too Large";
 		case 414: return "URI Too Long";
+        case 415: return "Unsupported Media Type";
         case 500: return "Internal Server Error";
+		case 501: return "Not Implemented";
+        case 502: return "Bad Gateway";
         default:  return "Unknown Status";
     }
 }

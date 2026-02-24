@@ -32,6 +32,7 @@ class HttpRequest
 		std::string getHost() const;
 		std::string getVersion() const;
 		std::string getBody() const;
+		const std::map<std::string, std::string>& getHeaders() const;
 		ParseStatus getStatus() const;
 		int getStatusCode() const;
 		int getRequestSize() const;
