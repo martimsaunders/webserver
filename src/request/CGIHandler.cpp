@@ -5,17 +5,72 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <cctype>
+#include <sstream>
 
-// what about path_info?
 std::string CGIHandler::extractExtension(const std::string& path)
 {
-    size_t slashPos = path.find_last_of('/');
-    size_t dotPos = path.find_last_of('.');
-    if (dotPos == std::string::npos)
+    size_t end = path.size();
+    while (end > 0)
+    {
+        size_t slashPos = path.rfind('/', end - 1);
+        size_t start = (slashPos == std::string::npos) ? 0 : slashPos + 1;
+        std::string segment = path.substr(start, end - start);
+        size_t dotPos = segment.rfind('.');
+        if (dotPos != std::string::npos && dotPos > 0 && dotPos + 1 < segment.size())
+            return segment.substr(dotPos);
+        if (start == 0)
+            break;
+        end = start - 1;
+    }
+    return "";
+}
+
+std::string CGIHandler::extractScriptPath(const std::string& fullPath, const std::string& ext)
+{
+    if (ext.empty())
+        return fullPath;
+
+    size_t pos = fullPath.find(ext);
+    while (pos != std::string::npos)
+    {
+        size_t extEnd = pos + ext.size();
+        if (extEnd == fullPath.size() || fullPath[extEnd] == '/')
+            return fullPath.substr(0, extEnd);
+        pos = fullPath.find(ext, pos + 1);
+    }
+    return fullPath;
+}
+
+std::string CGIHandler::extractPathInfo(const std::string& uriPath, const std::string& ext)
+{
+    if (uriPath.empty() || ext.empty())
         return "";
-    if (slashPos != std::string::npos && dotPos < slashPos)
-        return "";
-    return path.substr(dotPos);
+
+    size_t pos = uriPath.find(ext);
+    while (pos != std::string::npos)
+    {
+        size_t extEnd = pos + ext.size();
+        if (extEnd == uriPath.size())
+            return "";
+        if (uriPath[extEnd] == '/')
+            return uriPath.substr(extEnd);
+        pos = uriPath.find(ext, pos + 1);
+    }
+    return "";
+}
+
+std::string CGIHandler::extractScriptName(const std::string& uriPath, const std::string& pathInfo)
+{
+    if (uriPath.empty() || pathInfo.empty())
+        return uriPath;
+    if (uriPath.size() < pathInfo.size())
+        return uriPath;
+
+    size_t splitPos = uriPath.size() - pathInfo.size();
+    if (uriPath.substr(splitPos) == pathInfo)
+        return uriPath.substr(0, splitPos);
+    return uriPath;
 }
 
 std::string CGIHandler::resolveInterpreter(const Location& location, const std::string& ext)
@@ -26,46 +81,121 @@ std::string CGIHandler::resolveInterpreter(const Location& location, const std::
     return it->second;
 }
 
+std::vector<char*> CGIHandler::buildCgiArgv(const std::string& interpreter,
+                                            const std::string& scriptPath)
+{
+    std::vector<char*> argv;
+    argv.push_back(const_cast<char*>(interpreter.c_str()));
+    argv.push_back(const_cast<char*>(scriptPath.c_str()));
+    argv.push_back(NULL);
+    return argv;
+}
+
+std::vector<std::string> CGIHandler::buildCgiEnv(const HttpRequest& request,
+                                                 const Location& location,
+                                                 const ServerConfig& serverConfig,
+                                                 const std::string& scriptPath,
+                                                 const std::string& scriptExtension)
+{
+    (void)location;
+    std::vector<std::string> env;
+    const std::string pathInfo = extractPathInfo(request.getUriPath(), scriptExtension);
+    const std::string scriptName = extractScriptName(request.getUriPath(), pathInfo);
+
+    env.push_back("REQUEST_METHOD=" + request.getMethod());
+    env.push_back("QUERY_STRING=" + request.getQueryString());
+    env.push_back("SERVER_PROTOCOL=" + request.getVersion());
+    env.push_back("SCRIPT_FILENAME=" + scriptPath);
+    env.push_back("SCRIPT_NAME=" + scriptName);
+    env.push_back("PATH_INFO=" + pathInfo);
+    env.push_back("SERVER_SOFTWARE=webserv/1.0");
+    env.push_back("SERVER_NAME=" + serverConfig.host);
+    std::ostringstream portStream;
+    portStream << serverConfig.port;
+    env.push_back("SERVER_PORT=" + portStream.str());
+
+    std::string contentType;
+    if (request.tryGetHeader("content-type", contentType) || request.tryGetHeader("content-type:", contentType))
+        env.push_back("CONTENT_TYPE=" + contentType);
+
+    std::string contentLength;
+    if (request.tryGetHeader("content-length", contentLength) || request.tryGetHeader("content-length:", contentLength))
+        env.push_back("CONTENT_LENGTH=" + contentLength);
+
+    if (!request.getHost().empty())
+        env.push_back("HTTP_HOST=" + request.getHost());
+
+    const std::map<std::string, std::string>& headers = request.getHeaders();
+    for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
+    {
+        std::string key = it->first;
+        while (!key.empty() && key[key.size() - 1] == ':')
+            key.erase(key.size() - 1);
+
+        for (size_t i = 0; i < key.size(); ++i)
+        {
+            if (key[i] == '-')
+                key[i] = '_';
+            else
+                key[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(key[i])));
+        }
+
+        if (key == "CONTENT_TYPE" || key == "CONTENT_LENGTH" || key == "HOST")
+            continue;
+        env.push_back("HTTP_" + key + "=" + it->second);
+    }
+
+    return env;
+}
+
 HttpResponse CGIHandler::execute(const HttpRequest& request,
                                  const Location& location,
                                  const std::string& fullPath,
                                  const FileInfo& info,
                                  const ServerConfig& serverConfig)
 {
+    (void)info;
+
     // CGI should only handle GET/POST in this project scope.
     if (request.getMethod() != "GET" && request.getMethod() != "POST")
         return ResponseBuilder::buildErrorResponse(405, serverConfig);
 
-    // Target script must resolve to an existing regular file.
-	if (info.status != FILE_OK)
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
-    if (!info.isRegularFile)
-		return ResponseBuilder::buildErrorResponse(404, serverConfig);
-
     // Resolve CGI extension/interpreter from location config.
     std::string scriptExtension = extractExtension(fullPath);
     std::string interpreterPath = resolveInterpreter(location, scriptExtension);
-
     if (scriptExtension.empty() || interpreterPath.empty())
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
 
+    // Support URI path-info by trimming filesystem path to actual script file.
+    std::string scriptPath = extractScriptPath(fullPath, scriptExtension);
+    FileInfo scriptInfo = FileService::getFileInfo(scriptPath);
+
+    // Target script must resolve to an existing regular file.
+	if (scriptInfo.status == FILE_NOT_FOUND)
+        return ResponseBuilder::buildErrorResponse(404, serverConfig);
+    if (scriptInfo.status == FILE_FORBIDDEN)
+        return ResponseBuilder::buildErrorResponse(403, serverConfig);
+	if (scriptInfo.status != FILE_OK)
+        return ResponseBuilder::buildErrorResponse(500, serverConfig);
+    if (!scriptInfo.isRegularFile)
+		return ResponseBuilder::buildErrorResponse(404, serverConfig);
+
     // Validate interpreter/script execute/read permissions.
-	if (!info.readable)
+	if (!scriptInfo.readable)
 		return ResponseBuilder::buildErrorResponse(403, serverConfig);
     if (access(interpreterPath.c_str(), X_OK) != 0)
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
 
-    // 5) Build CGI environment from request + server context.
-    // Required env keys typically include:
-    // REQUEST_METHOD, QUERY_STRING, CONTENT_TYPE, CONTENT_LENGTH,
-    // SCRIPT_NAME, PATH_INFO, SERVER_PROTOCOL, HTTP_HOST.
-    // TODO(helper): std::vector<std::string> buildCgiEnv(const HttpRequest&, const Location&, const ServerConfig&, const std::string& fullPath);
-    std::vector<std::string> envStorage;
-    std::vector<char*> envp;
+    // Build CGI environment from request + server context.
+    std::vector<std::string> envStorage = buildCgiEnv(request, location, serverConfig, scriptPath, scriptExtension);
+    // Create execve envp as vector of pointers to strings in envStorage
+	std::vector<char*> envp;
+    for (size_t i = 0; i < envStorage.size(); ++i)
+        envp.push_back(const_cast<char*>(envStorage[i].c_str()));
+    envp.push_back(NULL);
 
-    // 6) Build argv for execve (interpreter + script).
-    // TODO(helper): std::vector<char*> buildCgiArgv(const std::string& interpreter, const std::string& scriptPath);
-    std::vector<char*> argv;
+    // Build argv for execve (interpreter + script).
+    std::vector<char*> argv = buildCgiArgv(interpreterPath, scriptPath);
 
     // 7) Create stdin/stdout pipes for CGI child process.
     int stdinPipe[2];

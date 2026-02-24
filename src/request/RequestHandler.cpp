@@ -70,10 +70,10 @@ HttpResponse RequestHandler::handleRequest(const HttpRequest& request, const Ser
     if (!location)
 		return ResponseBuilder::buildErrorResponse(404, serverConfig);
 
-	//reject if method not allowed (405)
+	//reject if method not allowed (501)
     HttpMethod method = stringToMethod(request.getMethod());
     if (method == UNKNOWN){
-        return ResponseBuilder::buildErrorResponse(405, serverConfig);}
+        return ResponseBuilder::buildErrorResponse(501, serverConfig);}
 
 	if (!checkMethod(method, *location)){
 		return ResponseBuilder::buildErrorResponse(405, serverConfig);}
@@ -100,15 +100,17 @@ HttpResponse RequestHandler::handleRequest(const HttpRequest& request, const Ser
 
     switch (method)
     {
-		//reject if invalid method (405)
+		//implemented methods
         case GET:
             return handleGet(location, fullPath, info, serverConfig);
         case POST:
             return handlePost(location, request, fullPath, info, serverConfig);
         case DELETE:
             return handleDelete(location, fullPath, info, serverConfig);
+        case UNKNOWN:
+            return ResponseBuilder::buildErrorResponse(501, serverConfig);
         default:
-            return ResponseBuilder::buildErrorResponse(405, serverConfig);
+            return ResponseBuilder::buildErrorResponse(500, serverConfig);
     }
 }
 
@@ -204,12 +206,6 @@ HttpResponse RequestHandler::handlePost(const Location* location,
 
 	//find filename or build (to create full path)
     const MultipartFile &multipartFile = request.getMultipartFile();
-    std::string extension;
-    if (!multipartFile.contentType.empty()){
-        extension = Mime::getExtension(multipartFile.contentType);}
-    if (extension.empty()){
-        extension = request.extensionFromContentType();}
-
     std::string filename = request.filenameFromContentDisposition();
     std::string bodyToWrite = request.getBody();
     if (!multipartFile.filename.empty())
@@ -217,6 +213,21 @@ HttpResponse RequestHandler::handlePost(const Location* location,
         filename = multipartFile.filename;
         bodyToWrite = multipartFile.data;
     }
+
+    std::string extension;
+    if (!filename.empty() && filename.find('.') != std::string::npos)
+        extension = filename.substr(filename.find_last_of('.'));
+    else
+    {
+        if (!multipartFile.contentType.empty())
+            extension = Mime::getExtension(multipartFile.contentType);
+        else
+            extension = request.extensionFromContentType();
+
+        if (extension.empty())
+            return ResponseBuilder::buildErrorResponse(415, serverConfig);
+    }
+
     std::string targetPath;
 	
 	//filename found (path + filename)
@@ -227,8 +238,15 @@ HttpResponse RequestHandler::handlePost(const Location* location,
         targetPath = joinPath(uploadPath, filename);
     }
 	//if no filename, build defaultName (path + defaultName)
-    else{
-        targetPath = buildDefaultFilename(uploadPath, extension);}
+    else
+    {
+        targetPath = buildDefaultFilename(uploadPath, extension);
+        size_t slashPos = targetPath.find_last_of('/');
+        if (slashPos == std::string::npos)
+            filename = targetPath;
+        else
+            filename = targetPath.substr(slashPos + 1);
+    }
 
 	// avoid overwriting an existing file
 	if (FileService::pathExists(targetPath)){
@@ -250,7 +268,7 @@ HttpResponse RequestHandler::handleDelete(const Location* location,
 	(void) location;
 	(void) path;
 
-	// deleting directories is not supported in this route
+	// recursive deleting directories is not supported
 	if (info.isDirectory){
 		return ResponseBuilder::buildErrorResponse(409, serverConfig);}
 
