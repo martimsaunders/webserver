@@ -17,8 +17,7 @@ void HttpResponse::setBody(const std::string& content) { body = content; }
 
 // Helper methods
 std::string HttpResponse::toString(){
-    std::string str;
-
+	
     std::ostringstream oss;
 	oss << "HTTP/1.1 " << statusCode << " " << reasonPhrase << "\r\n";
 	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); it++)

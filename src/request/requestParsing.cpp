@@ -39,7 +39,7 @@ int HttpRequest::readStartLine(std::string& requestBuffer){
     //invalid method
     if(startLine[0] != "GET" && startLine[0] != "POST" && startLine[0] != "DELETE" && startLine[0] != "HEAD" &&
         startLine[0] != "PUT  " && startLine[0] != "OPTIONS" && startLine[0] != "PATCH"){
-        errorMsg = "Start Line: Invalid Method";
+        errorMsg = "Method: Invalid Method";
         return 405;
     }
     //unauthorized method
@@ -51,14 +51,23 @@ int HttpRequest::readStartLine(std::string& requestBuffer){
 
     //long URI
     if(startLine[1].size() > 8000){
-        errorMsg = "Start Line: Long URI";
+        errorMsg = "Uri: Long URI";
         return 414;
     }
     this->setUri(startLine[1]);
 
+    if(uri.find("?") != std::string::npos){
+        if(std::count(uri.begin(), uri.end(), '?') > 1){
+            errorMsg = "Uri: Multiple '?'";
+            return 400;
+        }
+        queryString = 
+    }
+
+
     //invalid version/protocol
     if(startLine[2] != "HTTP/1.0" && startLine[2] != "HTTP/1.1"){
-        errorMsg = "Start Line: Invalid protocol/version";
+        errorMsg = "Protocol/Version: Invalid protocol/version";
         return 400;
     }
     this->setVersion(startLine[2]);

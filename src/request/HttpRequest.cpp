@@ -32,6 +32,72 @@ void HttpRequest::setIsMultipart(bool value) { isMultipart = value; }
 void HttpRequest::setBoundary(const std::string& value) { boundary = value; }
 void HttpRequest::setMultipartFile(const MultipartFile& value) { file = value; }
 
+int HttpRequest::extractFirstFilePartToBody(std::vector<std::string> multipart){
+    
+    std::string filePart;
+    std::string key;
+    for(std::vector<std::string>::iterator it = multipart.begin(); it != multipart.end(); it++){
+        
+        key = "name=\"file\"";
+        if((*it).find(key) == std::string::npos)
+            continue;
+        
+        filePart = *it;
+        break;
+    }
+    if(filePart.empty()){
+        errorMsg = "Multipart body: Missing file part";
+        return 400;
+    }
+    //file name
+    key = "filename=\"";
+    size_t start = filePart.find(key);
+
+    if(start == std::string::npos){
+        errorMsg = "Multipart body: Missing file name";
+        return 400;
+    }
+    start += key.size();
+
+    size_t end = filePart.find("\"", start);
+    if(end == std::string::npos){
+        errorMsg = "Multipart body: Invalid format of file name";
+        return 400;
+    }
+    this->file.filename = filePart.substr(start, end - start);
+    
+    //content type
+    key = "Content-Type: ";
+    start = filePart.find(key);
+
+    if(start == std::string::npos){
+        errorMsg = "Multipart body: Missing file content type";
+        return 400;
+    }
+    start += key.size();
+
+    end = filePart.find(NEWLINE, start);
+    if(end == std::string::npos){
+        errorMsg = "Multipart body: Invalid format of file content type";
+        return 400;
+    }
+    this->file.contentType = filePart.substr(start, end - start);
+
+    //data
+    start = filePart.find(HEADEND);
+
+    if(start == std::string::npos){
+        errorMsg = "Multipart body: Missing file data";
+        return 400;
+    }
+    start += key.size();
+
+    end = filePart.size();
+    this->file.data = filePart.substr(start, end - start);
+    
+    return 0;
+}
+
 int HttpRequest::multipartParsing(){
     this->isMultipart = true;
 
@@ -46,18 +112,7 @@ int HttpRequest::multipartParsing(){
         errorMsg = "Multipart body: Invalid format";
         return 400;
     }
-
-    for(std::vector<std::string>::iterator it = multipart.begin(); it != multipart.end(); it++){
-        if((*it).find("name=\"file\"") == std::string::npos)
-            continue;
-        
-        if((*it).find("filename=") == std::string::npos){
-            errorMsg = "Multipart body: Missing file name";
-            return 400;
-        }
-        //get filename and other values
-    }
-        
+    return extractFirstFilePartToBody(multipart);
 }
 
 // to call after recv() function / true if the request information is complete
@@ -73,7 +128,7 @@ void HttpRequest::parseRequest(const std::string& recvBuffer, size_t bodyMaxSize
     this->statusCode = readChunkedBody(requestBuffer, bodyMaxSize);
     
     if(detectMultipartAndBoundary()){
-        
+        this->statusCode = multipartParsing();
     }
 
     if(this->statusCode == 1)
@@ -194,6 +249,9 @@ std::string HttpRequest::filenameFromContentDisposition() const
 }
 
 bool HttpRequest::detectMultipartAndBoundary(){
+    if(this->state != ReadingContentLengthBody || this->state != ReadingChunkedBody || this->statusCode != 0)
+        return this->statusCode;
+    
     std::string contentType;
     if(!tryGetHeader("content-type", contentType))
         return false;
