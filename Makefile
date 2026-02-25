@@ -1,6 +1,6 @@
 NAME = webserv
 
-#src/request/CGIHandler.cpp \#
+
 SRCS = src/config/ParseConfig.cpp src/config/Parser.cpp \
 src/config/testConfig.cpp src/config/Tokenizer.cpp \
 src/config/ValidateConfig.cpp src/config/ServerConfig.cpp \
@@ -10,6 +10,7 @@ src/internal/FileService.cpp \
 src/request/HttpRequest.cpp src/request/RequestHandler.cpp \
 src/response/HttpResponse.cpp src/response/ResponseBuilder.cpp \
 src/response/Mime.cpp \
+src/request/CGIHandler.cpp \
 src/main.cpp
 
 OBJ_DIR = obj

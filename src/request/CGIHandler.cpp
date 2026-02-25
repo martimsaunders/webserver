@@ -328,16 +328,21 @@ HttpResponse CGIHandler::execute(const HttpRequest& request,
     FileInfo scriptInfo = FileService::getFileInfo(scriptPath);
 
     // Target script must resolve to an existing regular file and be readable.
-	if (scriptInfo.status == FILE_NOT_FOUND)
+	if (scriptInfo.status == FILE_NOT_FOUND){
         return ResponseBuilder::buildErrorResponse(404, serverConfig);
-    if (scriptInfo.status == FILE_FORBIDDEN)
+    }
+    if (scriptInfo.status == FILE_FORBIDDEN){
         return ResponseBuilder::buildErrorResponse(403, serverConfig);
-	if (scriptInfo.status != FILE_OK)
+    }
+	if (scriptInfo.status != FILE_OK){
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
-    if (!scriptInfo.isRegularFile)
+    }
+    if (!scriptInfo.isRegularFile){
 		return ResponseBuilder::buildErrorResponse(404, serverConfig);
-	if (!scriptInfo.readable)
+    }
+	if (!scriptInfo.readable){
 		return ResponseBuilder::buildErrorResponse(403, serverConfig);
+    }
 
     // CGI environment from request + server context.
     std::vector<std::string> envStorage = buildCgiEnv(request, location, serverConfig, scriptPath, scriptExtension);
@@ -448,12 +453,14 @@ HttpResponse CGIHandler::execute(const HttpRequest& request,
 
 	// wait for child process to end execution
     int status = 0;
-    if (waitpid(pid, &status, 0) < 0)
+    if (waitpid(pid, &status, 0) < 0){
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
+    }
 
 	// If malformed output, return 502
-	if (cgiRawOutput.empty())
+	if (cgiRawOutput.empty()){
         return ResponseBuilder::buildErrorResponse(502, serverConfig);
+    }
 
     int cgiStatusCode = 200;
     std::map<std::string, std::string> cgiHeaders;

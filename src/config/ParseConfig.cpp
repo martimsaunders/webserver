@@ -58,7 +58,7 @@ Config createConfig(std::string const &path){
 		validateConfig(cfg);
 
 		// Optional debug: print final config structure
-		//debugPrintConfig(cfg);
+		debugPrintConfig(cfg);
 
 		return (cfg);
 }

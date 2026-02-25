@@ -35,14 +35,17 @@ FileInfo FileService::getFileInfo(const std::string& path)
 
 
     // Phase 3 — Permission checks
-    if (access(path.c_str(), R_OK) == 0)
+    if (access(path.c_str(), R_OK) == 0){
         info.readable = true;
+    }
 
-    if (access(path.c_str(), W_OK) == 0)
+    if (access(path.c_str(), W_OK) == 0){
         info.writable = true;
+    }
 
-	if (access(path.c_str(), X_OK) == 0)
-		info.executable = true;
+	if (access(path.c_str(), X_OK) == 0){
+        info.executable = true;
+    }
     return info;
 }
 

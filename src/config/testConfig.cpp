@@ -22,13 +22,9 @@ static void printErrorPages(const std::map<int, std::string>& m, int ind) {
 	}
 }
 
-static void printCgi(const std::map<std::string, std::string>& m, int ind) {
+static void printCgi(std::string const &m, int ind) {
 	indent(ind);
-	std::cout << "cgi (" << m.size() << ")\n";
-	for (std::map<std::string, std::string>::const_iterator it = m.begin(); it != m.end(); ++it) {
-		indent(ind + 2);
-		std::cout << it->first << " -> " << it->second << "\n";
-	}
+	std::cout << "cgi: " << ".py -> " <<  m << "\n";
 }
 
 static void printLocation(const LocationConfig& loc, int ind) {
@@ -61,7 +57,7 @@ static void printLocation(const LocationConfig& loc, int ind) {
 			  << " target=" << loc.redirect_target << "\n";
 
 	printErrorPages(loc.error_pages, ind + 2);
-	printCgi(loc.cgi, ind + 2);
+	printCgi(loc.interpreter_path, ind + 2);
 
 	indent(ind);
 	std::cout << "}\n";

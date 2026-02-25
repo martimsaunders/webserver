@@ -402,6 +402,7 @@ LocationConfig Parser::parselocation(std::string const &path, ServerConfig const
 	bool seen_upload_store = false;
 	bool seen_upload = false;
 	bool seen_return = false;
+	bool seen_cgi = false;
 
 	while(!match(RBrace)){
 		if (match(End))
@@ -600,6 +601,8 @@ LocationConfig Parser::parselocation(std::string const &path, ServerConfig const
 		else if (name == "cgi"){
 			// cgi <.ext> <binary_path>;
 			// Stores mapping: extension -> executable path.
+			if (seen_cgi)
+				throw ParseError("duplicate 'cgi' in location block", peek());
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected cgi extension after cgi", peek());
 
@@ -608,17 +611,21 @@ LocationConfig Parser::parselocation(std::string const &path, ServerConfig const
 				throw ParseError("cgi extension cannot be empty", peek());
 			if (ext[0] != '.')
 				throw ParseError("cgi extension must start with '.'", peek());
+			if (ext != ".py")
+				throw ParseError("cgi extension must be '.py'", peek());
 			if (!(match(Identifier) || match(String)))
 				throw ParseError("expected path after cgi extension", peek());
-			if (loc.cgi.count(ext))
-				throw ParseError("duplicate cgi extension in location block", peek());
 
 			std::string bin = consume().value;
 			if (bin.empty())
 				throw ParseError("cgi path cannot be empty", peek());
+			if (bin.size() > 1 && bin[bin.size() - 1] == '/')
+				throw ParseError("cgi path must not end with '/'", peek());
 				
-			loc.cgi[ext] = bin;
+			loc.interpreter_path = bin;
 			expectSemicolon();
+			seen_cgi = true;
+			loc.is_cgi = true;
 		}
 		else{
 			throw ParseError(std::string("unknown directive in location: ") + name, peek());
