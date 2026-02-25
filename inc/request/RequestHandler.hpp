@@ -2,6 +2,7 @@
 #include "../internal/FileService.hpp"
 #include "HttpRequest.hpp"
 #include "../response/HttpResponse.hpp"
+#include "RequestResult.hpp"
 #include "../config/ServerConfig.hpp"
 
 // Router + Controller Class (stateless)
@@ -12,7 +13,7 @@ class RequestHandler
 			static std::string buildDefaultFilename(const std::string& directory, const std::string& extension);
 			static std::string joinPath(const std::string& directory, const std::string& filename);
 	public:
-		static HttpResponse handleRequest(
+		static RequestResult handleRequest(
 			const HttpRequest& request,
 			const ServerConfig& server
 		);

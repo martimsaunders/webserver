@@ -501,12 +501,12 @@ void Webserv::handleClientRead(int fd){
 
 	// Complete request -> generate response
 	else if (client.parser.getStatus() == HttpRequest::Complete){
-		HttpResponse resp = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
+		RequestResult result = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
 
 		// Remove only the consumed request from the input (basic pipelining)
 		client.in.erase(0, client.parser.getRequestSize());
 
-		client.out = resp.toString();
+		client.out = result.response.toString();
 		client.las_write_progress_tick = g_tick;
 		client.has_completed_request = true;
 
@@ -580,9 +580,9 @@ void Webserv::handleClientWrite(int fd){
 		if (client.parser.getStatus() == HttpRequest::Incomplete)
 			return;
 		else if (client.parser.getStatus() == HttpRequest::Complete){
-			HttpResponse resp = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
+			RequestResult result = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
 			client.in.erase(0, client.parser.getRequestSize());
-			client.out = resp.toString();
+			client.out = result.response.toString();
 			client.las_write_progress_tick = g_tick;
 			setPollEvents(fd, POLLOUT);
 			client.parser = HttpRequest();

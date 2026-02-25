@@ -63,52 +63,52 @@ std::string RequestHandler::joinPath(const std::string& directory, const std::st
     return directory + "/" + filename;
 }
 
-HttpResponse RequestHandler::handleRequest(const HttpRequest& request, const ServerConfig& serverConfig)
+RequestResult RequestHandler::handleRequest(const HttpRequest& request, const ServerConfig& serverConfig)
 {
 	//reject if location block does not exist (404)
     const Location* location = serverConfig.findLocation(request.getUri());
     if (!location)
-		return ResponseBuilder::buildErrorResponse(404, serverConfig);
+		return RequestResult::immediate(ResponseBuilder::buildErrorResponse(404, serverConfig));
 
 	//reject if method not allowed (501)
     HttpMethod method = stringToMethod(request.getMethod());
     if (method == UNKNOWN){
-        return ResponseBuilder::buildErrorResponse(501, serverConfig);}
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(501, serverConfig));}
 
 	if (!checkMethod(method, *location)){
-		return ResponseBuilder::buildErrorResponse(405, serverConfig);}
+		return RequestResult::immediate(ResponseBuilder::buildErrorResponse(405, serverConfig));}
 
 	//override with redirect if in location block (dynamic code)
     if (location->hasRedirect()){
-        return ResponseBuilder::buildRedirectResponse(*location);}
+        return RequestResult::immediate(ResponseBuilder::buildRedirectResponse(*location));}
 
 	//reject unsafe path string (403)
     std::string fullPath = location->resolvePath(request.getUri());
     if (fullPath.empty()){
-        return ResponseBuilder::buildErrorResponse(403, serverConfig);}
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(403, serverConfig));}
 
 	//reject if not found (404) or forbidden(403), default to (500)
     FileInfo info = FileService::getFileInfo(fullPath); 
     if (info.status != FILE_OK){
-        return ResponseBuilder::buildErrorResponse(info, serverConfig);}
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(info, serverConfig));}
 
-	// Override if CGI endpoint
+    // Override if CGI endpoint
     if (location->is_cgi)
-        return CGIHandler::execute(request, *location, fullPath, info, serverConfig);
+        return CGIHandler::startCgi(request, *location, fullPath, info, serverConfig);
 
     switch (method)
     {
 		//implemented methods
         case GET:
-            return handleGet(location, fullPath, info, serverConfig);
+            return RequestResult::immediate(handleGet(location, fullPath, info, serverConfig));
         case POST:
-            return handlePost(location, request, fullPath, info, serverConfig);
+            return RequestResult::immediate(handlePost(location, request, fullPath, info, serverConfig));
         case DELETE:
-            return handleDelete(location, fullPath, info, serverConfig);
+            return RequestResult::immediate(handleDelete(location, fullPath, info, serverConfig));
         case UNKNOWN:
-            return ResponseBuilder::buildErrorResponse(501, serverConfig);
+            return RequestResult::immediate(ResponseBuilder::buildErrorResponse(501, serverConfig));
         default:
-            return ResponseBuilder::buildErrorResponse(500, serverConfig);
+            return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
     }
 }
 

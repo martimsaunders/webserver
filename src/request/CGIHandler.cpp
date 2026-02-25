@@ -24,14 +24,6 @@ bool CGIHandler::createCgiPipes(int stdinPipe[2], int stdoutPipe[2])
     return true;
 }
 
-bool CGIHandler::setCgiPipesNonBlocking(int stdinPipe[2], int stdoutPipe[2])
-{
-    return fcntl(stdinPipe[0], F_SETFL, O_NONBLOCK) == 0
-        && fcntl(stdinPipe[1], F_SETFL, O_NONBLOCK) == 0
-        && fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK) == 0
-        && fcntl(stdoutPipe[1], F_SETFL, O_NONBLOCK) == 0;
-}
-
 void CGIHandler::closeCgiPipes(int stdinPipe[2], int stdoutPipe[2])
 {
     close(stdinPipe[0]); close(stdinPipe[1]);
@@ -111,43 +103,6 @@ std::vector<char*> CGIHandler::buildCgiArgv(const std::string& interpreter,
     argv.push_back(const_cast<char*>(scriptPath.c_str()));
     argv.push_back(NULL);
     return argv;
-}
-
-bool CGIHandler::writeAll(int fd, const std::string& data)
-{
-    size_t total = 0;
-    while (total < data.size())
-    {
-        ssize_t n = write(fd, data.data() + total, data.size() - total);
-        if (n > 0)
-        {
-            total += static_cast<size_t>(n);
-            continue;
-        }
-        if (n < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK))
-            continue;
-        return false;
-    }
-    return true;
-}
-
-bool CGIHandler::readAll(int fd, std::string& out)
-{
-    char buffer[4096];
-    while (true)
-    {
-        ssize_t n = read(fd, buffer, sizeof(buffer));
-        if (n > 0)
-        {
-            out.append(buffer, static_cast<size_t>(n));
-            continue;
-        }
-        if (n == 0)
-            return true;
-        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
-            continue;
-        return false;
-    }
 }
 
 bool CGIHandler::parseCgiOutput(const std::string& raw,
@@ -278,59 +233,56 @@ std::vector<std::string> CGIHandler::buildCgiEnv(const HttpRequest& request,
     return env;
 }
 
-HttpResponse CGIHandler::execute(const HttpRequest& request,
-                                 const Location& location,
-                                 const std::string& fullPath,
-                                 const FileInfo& info,
-                                 const ServerConfig& serverConfig)
+RequestResult CGIHandler::startCgi(const HttpRequest& request,
+                                   const Location& location,
+                                   const std::string& fullPath,
+                                   const FileInfo& info,
+                                   const ServerConfig& serverConfig)
 {
     (void)info;
+    CgiStartData startData;
 
     // CGI should only handle GET/POST in this project scope.
     if (request.getMethod() != "GET" && request.getMethod() != "POST")
-        return ResponseBuilder::buildErrorResponse(405, serverConfig);
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(405, serverConfig));
 
     // Resolve CGI extension/interpreter from location config.
     std::string scriptExtension = extractExtension(fullPath);
     if (scriptExtension != ".py")
-        return ResponseBuilder::buildErrorResponse(501, serverConfig);
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(501, serverConfig));
+
     std::string interpreterPath = location.interpreter_path;
     if (interpreterPath.empty())
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
 
     // Interpreter path must resolve to a readable/executable regular file.
     FileInfo interpreterInfo = FileService::getFileInfo(interpreterPath);
     if (interpreterInfo.status != FILE_OK)
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
     if (!interpreterInfo.isRegularFile || !interpreterInfo.readable || !interpreterInfo.executable)
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
 
     // Support URI path-info by trimming filesystem path to actual script file.
     std::string scriptPath = extractScriptPath(fullPath, scriptExtension);
     FileInfo scriptInfo = FileService::getFileInfo(scriptPath);
 
     // Target script must resolve to an existing regular file and be readable.
-	if (scriptInfo.status == FILE_NOT_FOUND){
-        return ResponseBuilder::buildErrorResponse(404, serverConfig);
-    }
-    if (scriptInfo.status == FILE_FORBIDDEN){
-        return ResponseBuilder::buildErrorResponse(403, serverConfig);
-    }
-	if (scriptInfo.status != FILE_OK){
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
-    }
-    if (!scriptInfo.isRegularFile){
-		return ResponseBuilder::buildErrorResponse(404, serverConfig);
-    }
-	if (!scriptInfo.readable){
-		return ResponseBuilder::buildErrorResponse(403, serverConfig);
-    }
+    if (scriptInfo.status == FILE_NOT_FOUND)
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(404, serverConfig));
+    if (scriptInfo.status == FILE_FORBIDDEN)
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(403, serverConfig));
+    if (scriptInfo.status != FILE_OK)
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
+    if (!scriptInfo.isRegularFile)
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(404, serverConfig));
+    if (!scriptInfo.readable)
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(403, serverConfig));
 
     // CGI environment from request + server context.
     std::vector<std::string> envStorage = buildCgiEnv(request, location, serverConfig, scriptPath, scriptExtension);
-    
-	// execve envp as vector of pointers to strings in envStorage
-	std::vector<char*> envp;
+
+    // execve envp as vector of pointers to strings in envStorage
+    std::vector<char*> envp;
     for (size_t i = 0; i < envStorage.size(); ++i)
         envp.push_back(const_cast<char*>(envStorage[i].c_str()));
     envp.push_back(NULL);
@@ -342,20 +294,13 @@ HttpResponse CGIHandler::execute(const HttpRequest& request,
     int stdinPipe[2];
     int stdoutPipe[2];
     if (!createCgiPipes(stdinPipe, stdoutPipe))
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
-    
-	// set non-blocking flags on all fds
-    if (!setCgiPipesNonBlocking(stdinPipe, stdoutPipe))
-    {
-        closeCgiPipes(stdinPipe, stdoutPipe);
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
-    }
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
 
     pid_t pid = fork();
     if (pid < 0)
     {
         closeCgiPipes(stdinPipe, stdoutPipe);
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
     }
 
     if (pid == 0)
@@ -377,62 +322,21 @@ HttpResponse CGIHandler::execute(const HttpRequest& request,
         if (scriptDir.empty())
             scriptDir = "/";
         if (chdir(scriptDir.c_str()) < 0)
-        {
-			close(stdinPipe[0]); close(stdoutPipe[1]);
             std::exit(1);
-        }
 
         execve(interpreterPath.c_str(), &argv[0], &envp[0]);
-		close(stdinPipe[0]); close(stdoutPipe[1]);
         std::exit(1);
     }
 
     // close child-side pipe ends
-	close(stdinPipe[0]);
+    close(stdinPipe[0]);
     close(stdoutPipe[1]);
 
-    // For POST, input raw request body.
-    if (request.getMethod() == "POST")
-    {
-        if (!writeAll(stdinPipe[1], request.getBody()))
-        {
-			close(stdinPipe[1]); close(stdoutPipe[0]);
-            return ResponseBuilder::buildErrorResponse(500, serverConfig);
-        }
-    }
-    close(stdinPipe[1]);
-
-	// read raw output from cgi
-    std::string cgiRawOutput;
-    if (!readAll(stdoutPipe[0], cgiRawOutput))
-	{
-        close(stdoutPipe[0]);
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
-    }
-    close(stdoutPipe[0]);
-	
-	// wait for child process to end execution
-    int status = 0;
-	// waitpid error
-    if (waitpid(pid, &status, 0) < 0)
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
-	if (WIFSIGNALED(status))
-        return ResponseBuilder::buildErrorResponse(502, serverConfig);
-    if (!WIFEXITED(status))
-        return ResponseBuilder::buildErrorResponse(502, serverConfig);
-    if (WEXITSTATUS(status) != 0)
-        return ResponseBuilder::buildErrorResponse(502, serverConfig);
-
-	// If malformed output, return 502
-	if (cgiRawOutput.empty()){
-        return ResponseBuilder::buildErrorResponse(502, serverConfig);
-    }
-
-    int cgiStatusCode = 200;
-    std::map<std::string, std::string> cgiHeaders;
-    std::string cgiBody;
-    if (!parseCgiOutput(cgiRawOutput, cgiStatusCode, cgiHeaders, cgiBody))
-        return ResponseBuilder::buildErrorResponse(502, serverConfig);
-
-    return ResponseBuilder::buildCgiResponse(cgiStatusCode, cgiHeaders, cgiBody);
+    // Return parent-side descriptors/pid for deferred poll-driven CGI handling.
+    startData.active = true;
+    startData.pid = pid;
+    startData.stdinFd = stdinPipe[1];
+    startData.stdoutFd = stdoutPipe[0];
+    startData.requestBody = request.getBody();
+    return RequestResult::deferredCgi(startData);
 }
