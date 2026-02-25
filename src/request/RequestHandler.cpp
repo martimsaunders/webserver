@@ -93,10 +93,8 @@ HttpResponse RequestHandler::handleRequest(const HttpRequest& request, const Ser
         return ResponseBuilder::buildErrorResponse(info, serverConfig);}
 
 	// Override if CGI endpoint
-    if (location->isCgiRequest(request.getUri()))
-    {
-        // call CGIHandler to execute script and return response
-    }
+    if (location->is_cgi)
+        return CGIHandler::execute(request, *location, fullPath, info, serverConfig);
 
     switch (method)
     {

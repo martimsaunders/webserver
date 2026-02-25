@@ -6,20 +6,6 @@ bool LocationConfig::hasRedirect() const
 	return has_redirect && !redirect_target.empty(); 
 }
 
-bool LocationConfig::isCgiRequest(const std::string& uri) const
-{
-    size_t pos = uri.rfind('.');
-    if (pos == std::string::npos)
-        return false;
-    std::string ext = uri.substr(pos);
-    return cgi.find(ext) != cgi.end();
-}
-
-bool LocationConfig::matchesCgi(const std::string& extension) const
-{
-    return cgi.find(extension) != cgi.end();
-}
-
 std::string LocationConfig::resolvePath(const std::string& uri) const
 {
     // Map URI path to filesystem path rooted at this location root.
