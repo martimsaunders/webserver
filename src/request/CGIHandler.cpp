@@ -236,10 +236,8 @@ std::vector<std::string> CGIHandler::buildCgiEnv(const HttpRequest& request,
 RequestResult CGIHandler::startCgi(const HttpRequest& request,
                                    const Location& location,
                                    const std::string& fullPath,
-                                   const FileInfo& info,
                                    const ServerConfig& serverConfig)
 {
-    (void)info;
     CgiStartData startData;
 
     // CGI should only handle GET/POST in this project scope.

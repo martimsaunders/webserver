@@ -16,7 +16,6 @@ public:
         const HttpRequest& request,
         const Location& location,
         const std::string& fullPath,
-        const FileInfo& info,
         const ServerConfig& serverConfig
     );
 

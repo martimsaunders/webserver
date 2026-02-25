@@ -87,14 +87,14 @@ RequestResult RequestHandler::handleRequest(const HttpRequest& request, const Se
     if (fullPath.empty()){
         return RequestResult::immediate(ResponseBuilder::buildErrorResponse(403, serverConfig));}
 
+	// Override if CGI endpoint
+    if (location->is_cgi)
+        return CGIHandler::startCgi(request, *location, fullPath, serverConfig);
+
 	//reject if not found (404) or forbidden(403), default to (500)
     FileInfo info = FileService::getFileInfo(fullPath); 
     if (info.status != FILE_OK){
         return RequestResult::immediate(ResponseBuilder::buildErrorResponse(info, serverConfig));}
-
-    // Override if CGI endpoint
-    if (location->is_cgi)
-        return CGIHandler::startCgi(request, *location, fullPath, info, serverConfig);
 
     switch (method)
     {
