@@ -91,6 +91,8 @@ class HttpRequest
 		int readChunkedBody(std::string& requestBuffe, size_t bodyMaxSize);
 		int readContentLengthBody(std::string& requestBuffe, size_t bodyMaxSize);
 		int multipartParsing();
+		bool validateMethod(const std::vector<std::string>& startLine);
+		bool validateURI(const std::vector<std::string>& startLine);
 };
 
 
