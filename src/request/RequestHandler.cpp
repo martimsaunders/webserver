@@ -1,8 +1,3 @@
-/*
-TODO before cgi:
-path parsing coming from http (split query string, invalid chars(400), traversal(400))
-*/
-
 #include "../../inc/request/RequestHandler.hpp"
 #include "../../inc/request/CGIHandler.hpp"
 #include "../../inc/response/ResponseBuilder.hpp"
