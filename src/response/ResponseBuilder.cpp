@@ -160,3 +160,26 @@ HttpResponse ResponseBuilder::buildAutoindexResponse(const std::string& path, co
     body << "</ul></body></html>";
     return buildSimpleResponse(200, body.str(), "text/html");
 }
+
+HttpResponse ResponseBuilder::buildCgiResponse(int statusCode,
+                                               const std::map<std::string, std::string>& headers,
+                                               const std::string& body)
+{
+    HttpResponse res;
+    res.setStatusCode(statusCode);
+    res.setReasonPhrase(resolveReasonPhrase(statusCode));
+    res.setBody(body);
+
+    for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
+    {
+        if (it->first == "Status")
+            continue;
+        res.addHeader(it->first, it->second);
+    }
+
+    res.addHeader("Content-Length", toString(body.size()));
+    if (res.getHeaders().find("Content-Type") == res.getHeaders().end())
+        res.addHeader("Content-Type", "text/html");
+
+    return res;
+}
