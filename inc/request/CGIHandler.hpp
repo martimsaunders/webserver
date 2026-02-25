@@ -20,9 +20,9 @@ public:
     );
 
 private:
-    static bool createCgiPipes(int stdinPipe[2], int stdoutPipe[2], int errorPipe[2]);
-    static bool setCgiPipesNonBlocking(int stdinPipe[2], int stdoutPipe[2], int errorPipe[2]);
-    static void closeCgiPipes(int stdinPipe[2], int stdoutPipe[2], int errorPipe[2]);
+    static bool createCgiPipes(int stdinPipe[2], int stdoutPipe[2]);
+    static bool setCgiPipesNonBlocking(int stdinPipe[2], int stdoutPipe[2]);
+    static void closeCgiPipes(int stdinPipe[2], int stdoutPipe[2]);
     static std::string extractExtension(const std::string& path);
     static std::string extractScriptPath(const std::string& fullPath, const std::string& ext);
     static std::string extractPathInfo(const std::string& uriPath, const std::string& ext);
