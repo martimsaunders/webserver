@@ -10,8 +10,9 @@
 #include <cerrno>
 #include <fcntl.h>
 #include <signal.h>
+#include <cstdlib>
 
-bool CGIHandler::createCgiPipes(int stdinPipe[2], int stdoutPipe[2], int errorPipe[2])
+bool CGIHandler::createCgiPipes(int stdinPipe[2], int stdoutPipe[2])
 {
     if (pipe(stdinPipe) < 0)
         return false;
@@ -20,30 +21,21 @@ bool CGIHandler::createCgiPipes(int stdinPipe[2], int stdoutPipe[2], int errorPi
         close(stdinPipe[0]); close(stdinPipe[1]);
         return false;
     }
-    if (pipe(errorPipe) < 0)
-    {
-        close(stdinPipe[0]); close(stdinPipe[1]);
-        close(stdoutPipe[0]); close(stdoutPipe[1]);
-        return false;
-    }
     return true;
 }
 
-bool CGIHandler::setCgiPipesNonBlocking(int stdinPipe[2], int stdoutPipe[2], int errorPipe[2])
+bool CGIHandler::setCgiPipesNonBlocking(int stdinPipe[2], int stdoutPipe[2])
 {
     return fcntl(stdinPipe[0], F_SETFL, O_NONBLOCK) == 0
         && fcntl(stdinPipe[1], F_SETFL, O_NONBLOCK) == 0
         && fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK) == 0
-        && fcntl(stdoutPipe[1], F_SETFL, O_NONBLOCK) == 0
-        && fcntl(errorPipe[0], F_SETFL, O_NONBLOCK) == 0
-        && fcntl(errorPipe[1], F_SETFL, O_NONBLOCK) == 0;
+        && fcntl(stdoutPipe[1], F_SETFL, O_NONBLOCK) == 0;
 }
 
-void CGIHandler::closeCgiPipes(int stdinPipe[2], int stdoutPipe[2], int errorPipe[2])
+void CGIHandler::closeCgiPipes(int stdinPipe[2], int stdoutPipe[2])
 {
     close(stdinPipe[0]); close(stdinPipe[1]);
     close(stdoutPipe[0]); close(stdoutPipe[1]);
-    close(errorPipe[0]); close(errorPipe[1]);
 }
 
 std::string CGIHandler::extractExtension(const std::string& path)
@@ -119,16 +111,6 @@ std::vector<char*> CGIHandler::buildCgiArgv(const std::string& interpreter,
     argv.push_back(const_cast<char*>(scriptPath.c_str()));
     argv.push_back(NULL);
     return argv;
-}
-
-void CGIHandler::killChild(pid_t pid, int writeFd, int readFd)
-{
-    kill(pid, SIGKILL);
-    waitpid(pid, NULL, 0);
-    if (writeFd >= 0)
-        close(writeFd);
-    if (readFd >= 0)
-        close(readFd);
 }
 
 bool CGIHandler::writeAll(int fd, const std::string& data)
@@ -359,42 +341,32 @@ HttpResponse CGIHandler::execute(const HttpRequest& request,
     // Create stdin/stdout pipes for CGI child process.
     int stdinPipe[2];
     int stdoutPipe[2];
-    int errorPipe[2];
-    if (!createCgiPipes(stdinPipe, stdoutPipe, errorPipe))
+    if (!createCgiPipes(stdinPipe, stdoutPipe))
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
     
 	// set non-blocking flags on all fds
-    if (!setCgiPipesNonBlocking(stdinPipe, stdoutPipe, errorPipe))
+    if (!setCgiPipesNonBlocking(stdinPipe, stdoutPipe))
     {
-        closeCgiPipes(stdinPipe, stdoutPipe, errorPipe);
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
-    }
-	
-	// set flag to close error pipe fd on execve
-    if (fcntl(errorPipe[1], F_SETFD, FD_CLOEXEC) < 0)
-    {
-        closeCgiPipes(stdinPipe, stdoutPipe, errorPipe);
+        closeCgiPipes(stdinPipe, stdoutPipe);
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
     }
 
     pid_t pid = fork();
     if (pid < 0)
     {
-        closeCgiPipes(stdinPipe, stdoutPipe, errorPipe);
+        closeCgiPipes(stdinPipe, stdoutPipe);
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
     }
 
     if (pid == 0)
     {
-        char setupError = 'E';
         close(stdinPipe[1]);
         close(stdoutPipe[0]);
 
         if (dup2(stdinPipe[0], STDIN_FILENO) < 0 || dup2(stdoutPipe[1], STDOUT_FILENO) < 0)
         {
             close(stdinPipe[0]); close(stdoutPipe[1]);
-            write(errorPipe[1], &setupError, 1);
-            read(errorPipe[0], &setupError, 1);
+            std::exit(1);
         }
 
         close(stdinPipe[0]);
@@ -407,55 +379,49 @@ HttpResponse CGIHandler::execute(const HttpRequest& request,
         if (chdir(scriptDir.c_str()) < 0)
         {
 			close(stdinPipe[0]); close(stdoutPipe[1]);
-            write(errorPipe[1], &setupError, 1);
-            read(errorPipe[0], &setupError, 1);
+            std::exit(1);
         }
 
         execve(interpreterPath.c_str(), &argv[0], &envp[0]);
 		close(stdinPipe[0]); close(stdoutPipe[1]);
-        write(errorPipe[1], &setupError, 1);
-        read(errorPipe[0], &setupError, 1);
+        std::exit(1);
     }
 
     // close child-side pipe ends
 	close(stdinPipe[0]);
     close(stdoutPipe[1]);
-    close(errorPipe[1]);
-
-	// detect setup error in child and terminate
-    char setupError = 0;
-    ssize_t setupRead = read(errorPipe[0], &setupError, 1);
-    close(errorPipe[0]);
-    if (setupRead != 0)
-    {
-        killChild(pid, stdinPipe[1], stdoutPipe[0]);
-        return ResponseBuilder::buildErrorResponse(500, serverConfig);
-    }
 
     // For POST, input raw request body.
     if (request.getMethod() == "POST")
     {
         if (!writeAll(stdinPipe[1], request.getBody()))
         {
-            killChild(pid, stdinPipe[1], stdoutPipe[0]);
+			close(stdinPipe[1]); close(stdoutPipe[0]);
             return ResponseBuilder::buildErrorResponse(500, serverConfig);
         }
     }
     close(stdinPipe[1]);
 
+	// read raw output from cgi
     std::string cgiRawOutput;
     if (!readAll(stdoutPipe[0], cgiRawOutput))
-    {
-        killChild(pid, -1, stdoutPipe[0]);
+	{
+        close(stdoutPipe[0]);
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
     }
     close(stdoutPipe[0]);
-
+	
 	// wait for child process to end execution
     int status = 0;
-    if (waitpid(pid, &status, 0) < 0){
+	// waitpid error
+    if (waitpid(pid, &status, 0) < 0)
         return ResponseBuilder::buildErrorResponse(500, serverConfig);
-    }
+	if (WIFSIGNALED(status))
+        return ResponseBuilder::buildErrorResponse(502, serverConfig);
+    if (!WIFEXITED(status))
+        return ResponseBuilder::buildErrorResponse(502, serverConfig);
+    if (WEXITSTATUS(status) != 0)
+        return ResponseBuilder::buildErrorResponse(502, serverConfig);
 
 	// If malformed output, return 502
 	if (cgiRawOutput.empty()){
