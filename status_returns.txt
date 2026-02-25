@@ -42,3 +42,9 @@
 	- delete operation succeeds -> 200 OK
 
 - method switch default case (unexpected enum path) -> 405 Method Not Allowed
+
+- httpRequest
+	- large URI value -> 414 URI Too Long
+	- invalid format -> 400 Bad request
+	- invlid characters -> 400 Bad request
+	- missing values -> 400 Bad request

@@ -33,211 +33,89 @@ void HttpRequest::setIsMultipart(bool value) { isMultipart = value; }
 void HttpRequest::setBoundary(const std::string& value) { boundary = value; }
 void HttpRequest::setMultipartFile(const MultipartFile& value) { file = value; }
 
-std::vector<std::string> HttpRequest::split(std::string str, const std::string& c){
-    std::vector<std::string> split;
-    size_t pos = str.find(c);
+int HttpRequest::extractFirstFilePartToBody(std::vector<std::string> multipart){
     
-    if(pos == std::string::npos){
-        return split;
-    }
-    
-    while(pos != std::string::npos){
-        split.push_back(str.substr(0, pos));
-        str.erase(0, pos + c.size());
-        pos = str.find(c);
-    }
-    split.push_back(str);
-    
-    return split;
-}
-
-int HttpRequest::readStartLine(std::string& requestBuffer){
-    if(this->state != ReadingStartLine || this->statusCode != 0)
-        return this->statusCode;
-
-    size_t pos = requestBuffer.find(NEWLINE);
-    //incomplete request
-    if(pos == std::string::npos)
-        return 1;
-
-    std::vector<std::string> startLine = split(requestBuffer.substr(0, pos), " ");
-    requestBuffer.erase(0, pos + 2);
-    this->requestSize += pos + 2;
-
-    //invalid request line format
-    if(startLine.size() != 3){
-        errorMsg = "Start Line: Invalid request line format";
-        return 400;
-    }
-    //invalid method
-    if(startLine[0] != "GET" && startLine[0] != "POST" && startLine[0] != "DELETE" && startLine[0] != "HEAD" &&
-        startLine[0] != "PUT  " && startLine[0] != "OPTIONS" && startLine[0] != "PATCH"){
-        errorMsg = "Start Line: Invalid Method";
-        return 405;
-    }
-    //unauthorized method
-    if(startLine[0] != "GET" && startLine[0] != "POST" && startLine[0] != "DELETE"){
-        this->setMethod("Unknown");
-    }
-    else
-        this->setMethod(startLine[0]);
-
-    //long URI
-    if(startLine[1].size() > 8000){
-        errorMsg = "Start Line: Long URI";
-        return 414;
-    }
-    this->setUri(startLine[1]);
-
-    //invalid version/protocol
-    if(startLine[2] != "HTTP/1.0" && startLine[2] != "HTTP/1.1"){
-        errorMsg = "Start Line: Invalid protocol/version";
-        return 400;
-    }
-    this->setVersion(startLine[2]);
-
-    this->state = ReadingHeaders;
-    return 0;
-}
-
-int HttpRequest::readHeaders(std::string& requestBuffer){
-    if(this->state != ReadingHeaders || this->statusCode != 0)
-        return this->statusCode;
-
-    size_t pos = requestBuffer.find(HEADEND);
-    //incomplete request
-    if(pos == std::string::npos)
-        return 1;
-
-    if(requestBuffer.substr(0, pos).size() > 16000){
-        errorMsg = "Headers: Headers field too large";
-        return 400;
-    }
-
-    std::vector<std::string> headersLine = split(requestBuffer.substr(0, pos), NEWLINE);
-
-    if(headersLine.empty()){
-        errorMsg = "Headers: Bad format, no new lines";
-        return 400;
-    }
-
-    requestBuffer.erase(0, pos + 4);
-    this->requestSize += pos + 4;
-
-    for(std::vector<std::string>::iterator it = headersLine.begin(); it != headersLine.end(); it++){
-
-        std::vector<std::string> header = split(*it, ": ");
-        //bad format
-        if (header.size() != 2){
-            errorMsg = "Header: Bad format";
-            return 400;
-        }
-        //header delimiter check
-        // if(std::count(header[0].begin(), header[0].end(), ':') != 1){
-        //     errorMsg = "Header: delimiter : error";
-        //     return 400;
-        // }
-
-        //invalid characters
-        for(std::string::iterator i = header[0].begin(); i != header[0].end(); i++){
-            if(!isalnum(*i) && *i != '-'){
-                errorMsg = "Header: Invalid character";
-                return 400;
-            }
-        }
-        //line too long
-        if((*it).size() > 8000){
-            errorMsg = "Header: Header line too large";
-            return 400;
-        }
+    std::string filePart;
+    std::string key;
+    for(std::vector<std::string>::iterator it = multipart.begin(); it != multipart.end(); it++){
         
-        this->addHeader(header[0], header[1]);
+        key = "name=\"file\"";
+        if((*it).find(key) == std::string::npos)
+            continue;
+        
+        filePart = *it;
+        break;
     }
-    //Host header missing
-    if(version == "HTTP/1.1" && !hasHeader("Host")){
-        errorMsg = "Header: Host header missing";
+    if(filePart.empty()){
+        errorMsg = "Multipart body: Missing file part";
         return 400;
     }
-    //two body types presence
-    if(hasHeader("Transfer-Encoding") && hasHeader("Content-Length")){
-        errorMsg = "Header: Two body types";
+    //file name
+    key = "filename=\"";
+    size_t start = filePart.find(key);
+
+    if(start == std::string::npos){
+        errorMsg = "Multipart body: Missing file name";
         return 400;
     }
-    if(hasHeader("Content-Length")){
-        //non numeric Content-Length
-        std::map<std::string, std::string>::iterator v = headers.find("Content-Length");
-        for(size_t i = 0; i < v->second.length(); i++){
-            if(!isdigit(v->second[i])){
-                errorMsg = "Header: Non numeris Content-Lenght value";
-                return 400;
-            }
-        }
-    }
-    //duplicated headers
-    for(std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); it++){
-        if(it->first == "Host" || it->first == "Content-Length" || it->first == "Transfer-Encoding" || it->first == "Content-Type"){
-            for(std::map<std::string, std::string>::iterator it2 = headers.begin(); it2 != headers.end(); it2++){
-                if(it2 == it)
-                    continue;
-                if(it2->first == it->first){
-                    errorMsg = "Header: Critical header duplicated";
-                    return 400; 
-                }
-            }
-        }
-    }
+    start += key.size();
 
-    if(this->getMethod() == "POST"){
-
-        if(hasHeader("Content-Length"))
-            this->state = ReadingContentLengthBody;
-        else if(hasHeader("Transfer-Encoding"))
-            this->state = ReadingChunkedBody;
-        else{
-            errorMsg = "Header: Missing body info header";
-            return 400;
-        }
+    size_t end = filePart.find("\"", start);
+    if(end == std::string::npos){
+        errorMsg = "Multipart body: Invalid format of file name";
+        return 400;
     }
+    this->file.filename = filePart.substr(start, end - start);
+    
+    //content type
+    key = "Content-Type: ";
+    start = filePart.find(key);
+
+    if(start == std::string::npos){
+        errorMsg = "Multipart body: Missing file content type";
+        return 400;
+    }
+    start += key.size();
+
+    end = filePart.find(NEWLINE, start);
+    if(end == std::string::npos){
+        errorMsg = "Multipart body: Invalid format of file content type";
+        return 400;
+    }
+    this->file.contentType = filePart.substr(start, end - start);
+
+    //data
+    start = filePart.find(HEADEND);
+
+    if(start == std::string::npos){
+        errorMsg = "Multipart body: Missing file data";
+        return 400;
+    }
+    start += key.size();
+
+    end = filePart.size();
+    this->file.data = filePart.substr(start, end - start);
+    
     return 0;
 }
 
-int HttpRequest::readContentLengthBody(std::string& requestBuffer, size_t bodyMaxSize){
-    if(this->state != ReadingContentLengthBody || this->statusCode != 0)
-        return this->statusCode;
-    
-    std::map<std::string, std::string>::const_iterator it = headers.find("Content-Length");
-    size_t bodySize = static_cast<size_t>(atoi(it->second.c_str()));
+int HttpRequest::multipartParsing(){
+    this->isMultipart = true;
 
-    if(bodySize > bodyMaxSize){
-        errorMsg = "Body: Body size too big";
-        return 413;
+    std::string contentType;
+    tryGetHeader("content-type", contentType);
+
+    size_t bpos = contentType.find("boundary=");
+    this->boundary = contentType.substr(bpos + 9, contentType.size() - bpos);
+
+    std::vector<std::string> multipart = split(body, boundary);
+    if(multipart.empty()){
+        errorMsg = "Multipart body: Invalid format";
+        return 400;
     }
-    //incomplete request
-    if(requestBuffer.size() < bodySize)
-        return 1;
-    
-    this->setBody(requestBuffer.substr(0, bodySize));
-    this->requestSize += bodySize;
-    return 0;
+    return extractFirstFilePartToBody(multipart);
 }
 
-int HttpRequest::readChunkedBody(std::string& requestBuffer, size_t bodyMaxSize){
-    if(this->state != ReadingChunkedBody || this->statusCode != 0)
-        return this->statusCode;
-
-    size_t pos = requestBuffer.find(HEADEND);
-    //incomplete request
-    if(pos == std::string::npos && requestBuffer.size() <= bodyMaxSize)
-        return 1;
-    
-    if(pos > bodyMaxSize){
-        errorMsg = "Body: Body size too big";
-        return 413;
-    }
-    this->setBody(requestBuffer.substr(0, pos));
-    this->requestSize += pos + 4;
-    return 0;
-}
 // to call after recv() function / true if the request information is complete
 void HttpRequest::parseRequest(const std::string& recvBuffer, size_t bodyMaxSize){
     
@@ -250,18 +128,13 @@ void HttpRequest::parseRequest(const std::string& recvBuffer, size_t bodyMaxSize
     this->statusCode = readContentLengthBody(requestBuffer, bodyMaxSize);
     this->statusCode = readChunkedBody(requestBuffer, bodyMaxSize);
     
+    if(detectMultipartAndBoundary()){
+        this->statusCode = multipartParsing();
+    }
+
     if(this->statusCode == 1)
         this->status = Incomplete;
     else if(this->statusCode == 0){
-        // put header names in lowercase (map keys are immutable, so rebuild map)
-        std::map<std::string, std::string> loweredHeaders;
-        for(std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); it++){
-            std::string key = it->first;
-            std::transform(key.begin(), key.end(), key.begin(),
-                static_cast<int (*)(int)>(std::tolower));
-            loweredHeaders[key] = it->second;
-        }
-        headers.swap(loweredHeaders);
         this->status = Complete;
     }
     else{
@@ -374,4 +247,21 @@ std::string HttpRequest::filenameFromContentDisposition() const
         rawName = rawName.substr(slashPos + 1);
 
     return sanitizeFilename(rawName);
+}
+
+bool HttpRequest::detectMultipartAndBoundary(){
+    if((this->state != ReadingContentLengthBody && this->state != ReadingChunkedBody) || this->statusCode != 0)
+        return false;
+    
+    std::string contentType;
+    if(!tryGetHeader("content-type", contentType))
+        return false;
+
+    if(contentType.find("multipart/form-data;", 0) == std::string::npos)
+        return false;
+    
+    if(contentType.find("boundary=", 0) == std::string::npos)
+        return false;
+
+    return true;
 }

@@ -60,7 +60,7 @@ class HttpRequest
 		std::string extensionFromContentType() const;
 		std::string filenameFromContentDisposition()const;
 		bool detectMultipartAndBoundary(); // Detect multipart/form-data and extract the boundary token.
-		int extractFirstFilePartToBody(); // Extract first multipart file part and fill MultipartFile struct.
+		int extractFirstFilePartToBody(std::vector<std::string> multipart); // Extract first multipart file part and normalize related headers.
 		void printRequest();
 
 	private:
@@ -91,6 +91,9 @@ class HttpRequest
 		int readHeaders(std::string& requestBuffer);
 		int readChunkedBody(std::string& requestBuffe, size_t bodyMaxSize);
 		int readContentLengthBody(std::string& requestBuffe, size_t bodyMaxSize);
+		int multipartParsing();
+		bool validateMethod(const std::vector<std::string>& startLine);
+		bool validateURI(const std::vector<std::string>& startLine);
 };
 
 
