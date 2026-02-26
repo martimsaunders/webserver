@@ -659,10 +659,45 @@ void Webserv::handleCgiRead(int cgi_fd){
 			c.should_close = true;
 		}
 		else{
-
+		
 		}
 	}
 }
+
+/* }else{
+            headers.erase("Status");
+
+            bool hasCL = false;
+            for (std::map<std::string, std::string>::const_iterator hit = headers.begin(); hit != headers.end(); ++hit){
+                if (hit->first == "Content-Length" || hit->first == "content-length"){
+                    hasCL = true;
+                    break;
+                }
+            }
+
+            std::ostringstream oss;
+            oss << "HTTP/1.1 " << statusCode << "\r\n";
+            for (std::map<std::string, std::string>::const_iterator hit = headers.begin(); hit != headers.end(); ++hit)
+                oss << hit->first << ": " << hit->second << "\r\n";
+            if (!hasCL)
+                oss << "Content-Length: " << body.size() << "\r\n";
+            oss << "\r\n" << body;
+
+            c.out = oss.str();
+        }
+
+        c.req_res.deferred = false;
+        c.req_res.cgi.active = false;
+
+        // volta a responder ao cliente
+        setPollEvents(client_fd, POLLOUT);
+        c.las_write_progress_tick = g_tick;
+        c.las_activity_tick = g_tick;
+        return;
+    }
+
+    // subject: n < 0 -> não usar errno. Espera próximo poll/timeout ou POLLERR/HUP.
+    return; */
 
 //========================================================================
 // handleClientRead
