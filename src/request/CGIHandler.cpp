@@ -288,31 +288,57 @@ RequestResult CGIHandler::startCgi(const HttpRequest& request,
     // argv for execve (interpreter + script).
     std::vector<char*> argv = buildCgiArgv(interpreterPath, scriptPath);
 
-    // Create stdin/stdout pipes for CGI child process.
-    int stdinPipe[2];
-    int stdoutPipe[2];
-    if (!createCgiPipes(stdinPipe, stdoutPipe))
+    // Create stdout pipe always; stdin pipe only for POST.
+    const bool isPost = (request.getMethod() == "POST");
+    int stdinPipe[2] = { -1, -1 };
+    int stdoutPipe[2] = { -1, -1 };
+
+    if (isPost && pipe(stdinPipe) < 0)
         return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
+    if (pipe(stdoutPipe) < 0)
+    {
+        if (isPost)
+        {
+            close(stdinPipe[0]);
+            close(stdinPipe[1]);
+        }
+        return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
+    }
 
     pid_t pid = fork();
     if (pid < 0)
     {
-        closeCgiPipes(stdinPipe, stdoutPipe);
+        if (isPost)
+        {
+            close(stdinPipe[0]);
+            close(stdinPipe[1]);
+        }
+        close(stdoutPipe[0]);
+        close(stdoutPipe[1]);
         return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
     }
 
     if (pid == 0)
     {
-        close(stdinPipe[1]);
         close(stdoutPipe[0]);
 
-        if (dup2(stdinPipe[0], STDIN_FILENO) < 0 || dup2(stdoutPipe[1], STDOUT_FILENO) < 0)
+        if (isPost)
         {
-            close(stdinPipe[0]); close(stdoutPipe[1]);
-            std::exit(1);
+            close(stdinPipe[1]);
+            if (dup2(stdinPipe[0], STDIN_FILENO) < 0)
+            {
+                close(stdinPipe[0]);
+                close(stdoutPipe[1]);
+                std::exit(1);
+            }
+            close(stdinPipe[0]);
         }
 
-        close(stdinPipe[0]);
+        if (dup2(stdoutPipe[1], STDOUT_FILENO) < 0)
+        {
+            close(stdoutPipe[1]);
+            std::exit(1);
+        }
         close(stdoutPipe[1]);
 
         size_t slashPos = scriptPath.find_last_of('/');
@@ -327,14 +353,15 @@ RequestResult CGIHandler::startCgi(const HttpRequest& request,
     }
 
     // close child-side pipe ends
-    close(stdinPipe[0]);
+    if (isPost)
+        close(stdinPipe[0]);
     close(stdoutPipe[1]);
 
     // Return parent-side descriptors/pid for deferred poll-driven CGI handling.
     startData.active = true;
     startData.pid = pid;
-    startData.stdinFd = stdinPipe[1];
+    startData.stdinFd = isPost ? stdinPipe[1] : -1;
     startData.stdoutFd = stdoutPipe[0];
-    startData.requestBody = request.getBody();
+    startData.requestBody = isPost ? request.getBody() : "";
     return RequestResult::deferredCgi(startData);
 }
