@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Resultado do formulário</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 40px; line-height: 1.4; }
+    h1 { margin-bottom: 10px; }
+    .result { font-size: 1.1rem; margin-top: 14px; }
+    code { background: #f3f3f3; padding: 2px 6px; border-radius: 4px; }
+    .links { margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <h1>Resultado</h1>
+
+  <p class="result" id="result">
+    A processar dados...
+  </p>
+
+  <div class="links">
+    <a href="/form">Voltar ao formulário</a> |
+    <a href="/">Voltar ao início</a>
+  </div>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const name = (params.get("name") || "").trim();
+      const ageRaw = (params.get("age") || "").trim();
+
+      const resultEl = document.getElementById("result");
+
+      // Validação simples (front-end) para a página estática
+      const ageNum = Number(ageRaw);
+      const ageOk = Number.isFinite(ageNum) && ageRaw !== "" && ageNum >= 0;
+
+      if (!name || !ageOk) {
+        resultEl.innerHTML = 'Dados inválidos. Volta ao <a href="/form">formulário</a> e tenta novamente.';
+        return;
+      }
+
+      // Escape básico para evitar injetar HTML vindo do querystring
+      const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[c]));
+
+      const safeName = escapeHtml(name);
+
+      resultEl.textContent = `O ${safeName} tem ${ageNum} anos.`;
+    })();
+  </script>
+</body>
+</html>

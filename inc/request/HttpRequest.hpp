@@ -61,7 +61,7 @@ class HttpRequest
 		std::string filenameFromContentDisposition()const;
 		bool detectMultipartAndBoundary(); // Detect multipart/form-data and extract the boundary token.
 		int extractFirstFilePartToBody(std::vector<std::string> multipart); // Extract first multipart file part and normalize related headers.
-		void printRequest();
+		void printRequest() const;
 
 	private:
 		std::string method;
