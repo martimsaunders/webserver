@@ -17,8 +17,7 @@ int HttpRequest::readHeaders(std::string& requestBuffer){
     std::vector<std::string> headersLine = split(requestBuffer.substr(0, pos), NEWLINE);
 
     if(headersLine.empty()){
-        errorMsg = "Headers: Bad format, no new lines";
-        return 400;
+        headersLine.push_back(requestBuffer.substr(0, pos));
     }
 
     requestBuffer.erase(0, pos + 4);

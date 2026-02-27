@@ -102,6 +102,8 @@ RequestResult RequestHandler::handleRequest(const HttpRequest& request, const Se
             return RequestResult::immediate(handleDelete(location, fullPath, info, serverConfig));
         case UNKNOWN:
             return RequestResult::immediate(ResponseBuilder::buildErrorResponse(501, serverConfig));
+        default:
+            return RequestResult::immediate(ResponseBuilder::buildErrorResponse(500, serverConfig));
     }
 }
 
