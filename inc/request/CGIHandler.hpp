@@ -18,6 +18,10 @@ public:
         const std::string& fullPath,
         const ServerConfig& serverConfig
     );
+	static bool parseCgiOutput(const std::string& raw,
+                               int& statusCode,
+                               std::map<std::string, std::string>& headers,
+                               std::string& body);
 
 private:
     static bool createCgiPipes(int stdinPipe[2], int stdoutPipe[2]);
@@ -28,10 +32,6 @@ private:
     static std::string extractScriptName(const std::string& uriPath, const std::string& pathInfo);
     static std::vector<char*> buildCgiArgv(const std::string& interpreter,
                                            const std::string& scriptPath);
-    static bool parseCgiOutput(const std::string& raw,
-                               int& statusCode,
-                               std::map<std::string, std::string>& headers,
-                               std::string& body);
     static std::vector<std::string> buildCgiEnv(const HttpRequest& request,
                                                 const Location& location,
                                                 const ServerConfig& serverConfig,

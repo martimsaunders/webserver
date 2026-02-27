@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include "../request/HttpRequest.hpp"
+#include "../request/RequestResult.hpp"
 
 struct		Client
 {
@@ -17,6 +18,7 @@ struct		Client
 	HttpRequest parser;
 	unsigned long las_activity_tick;
 	unsigned long las_write_progress_tick;
+	RequestResult req_res;
 
 };
 

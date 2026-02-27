@@ -37,4 +37,18 @@ class Webserv
 		void removeClient(int fd);
 		void removeListen(int fd);
 		void setPollEvents(int fd, short event);
+	
+	private:
+		enum CgiFdRole { CGI_FD_STDIN, CGI_FD_STDOUT };
+
+		struct CgiFdInfo{
+			int client_fd;
+			bool should_close;
+			CgiFdRole role;
+		};
+		std::map<int, CgiFdInfo> _cgiFds;
+		bool isCgiFd(int fd) const;
+		void handleCgiRead(int cgi_fd);
+		void handleCgiWrite(int cgi_fd);
+		void startDeferredCgiForClient(int client_fd);
 };
