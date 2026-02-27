@@ -22,5 +22,4 @@ class ResponseBuilder
     	static HttpResponse buildSimpleResponse(int statusCode, const std::string& body, const std::string& contentType);
     	static HttpResponse buildFileResponse(const std::string& fileContent, const std::string& filePath);
 		static HttpResponse buildAutoindexResponse(const std::string& path, const std::vector<std::string>& entries);
-		static HttpResponse buildCgiResponse(int statusCode, const std::map<std::string, std::string>& headers, const std::string& body);
 };

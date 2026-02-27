@@ -86,6 +86,34 @@ static void safeCloseFd(int &fd){
 	}
 }
 
+static std::string nowHttpDate()
+{
+	char buf[128];
+	std::time_t t = std::time(NULL);
+	std::tm* gmt = std::gmtime(&t);
+	if (!gmt)
+		return "";
+	if (std::strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", gmt) == 0)
+		return "";
+	return std::string(buf);
+}
+
+static bool iequalsAscii(const std::string& a, const std::string& b)
+{
+	if (a.size() != b.size())
+		return false;
+	for (size_t i = 0; i < a.size(); ++i)
+	{
+		unsigned char ca = static_cast<unsigned char>(a[i]);
+		unsigned char cb = static_cast<unsigned char>(b[i]);
+		if (ca >= 'A' && ca <= 'Z') ca = static_cast<unsigned char>(ca - 'A' + 'a');
+		if (cb >= 'A' && cb <= 'Z') cb = static_cast<unsigned char>(cb - 'A' + 'a');
+		if (ca != cb)
+			return false;
+	}
+	return true;
+}
+
 //========================================================================
 // Webserv: member functions
 //========================================================================
@@ -659,22 +687,35 @@ void Webserv::handleCgiRead(int cgi_fd){
 			c.should_close = true;
 		}
 		else{
-			headers.erase("Status");
-
-			bool hasCL = false;
+			// Determine final Content-Type from CGI output (fallback to text/html).
+			std::string contentType = "text/html";
 			for (std::map<std::string, std::string>::const_iterator hit = headers.begin(); hit != headers.end(); ++hit){
-				if (hit->first == "Content-Length" || hit->first == "content-length"){
-					hasCL = true;
+				if (iequalsAscii(hit->first, "Content-Type")){
+					contentType = hit->second;
 					break;
 				}
 			}
 
+			// Build HTTP response headers in canonical order.
 			std::ostringstream oss;
 			oss << "HTTP/1.1 " << statusCode << "\r\n";
-			for (std::map<std::string, std::string>::const_iterator hit = headers.begin(); hit != headers.end(); ++hit)
+			oss << "Date: " << nowHttpDate() << "\r\n";
+			oss << "Server: webserv\r\n";
+			oss << "Content-Length: " << body.size() << "\r\n";
+			oss << "Content-Type: " << contentType << "\r\n";
+			oss << "Connection: keep-alive\r\n";
+
+			// Append CGI-specific headers, excluding standard managed headers.
+			for (std::map<std::string, std::string>::const_iterator hit = headers.begin(); hit != headers.end(); ++hit){
+				if (iequalsAscii(hit->first, "Status")
+					|| iequalsAscii(hit->first, "Date")
+					|| iequalsAscii(hit->first, "Server")
+					|| iequalsAscii(hit->first, "Content-Length")
+					|| iequalsAscii(hit->first, "Content-Type")
+					|| iequalsAscii(hit->first, "Connection"))
+					continue;
 				oss << hit->first << ": " << hit->second << "\r\n";
-			if (!hasCL)
-				oss << "Content-Length: " << body.size() << "\r\n";
+			}
 			oss << "\r\n" << body;
 
 			c.out = oss.str();

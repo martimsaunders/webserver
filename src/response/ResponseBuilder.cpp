@@ -1,10 +1,48 @@
 #include "../../inc/response/ResponseBuilder.hpp"
+#include <ctime>
 
 static std::string toString(int n)
 {
     std::ostringstream oss;
     oss << n;
     return (oss.str());
+}
+
+static std::string nowHttpDate()
+{
+    char buf[128];
+    std::time_t t = std::time(NULL);
+    std::tm* gmt = std::gmtime(&t);
+    if (!gmt)
+        return "";
+    if (std::strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", gmt) == 0)
+        return "";
+    return std::string(buf);
+}
+
+static bool iequalsAscii(const std::string& a, const std::string& b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        unsigned char ca = static_cast<unsigned char>(a[i]);
+        unsigned char cb = static_cast<unsigned char>(b[i]);
+        if (ca >= 'A' && ca <= 'Z') ca = static_cast<unsigned char>(ca - 'A' + 'a');
+        if (cb >= 'A' && cb <= 'Z') cb = static_cast<unsigned char>(cb - 'A' + 'a');
+        if (ca != cb)
+            return false;
+    }
+    return true;
+}
+
+static void applyStandardHeaders(HttpResponse& res, size_t contentLength, const std::string& contentType)
+{
+    res.addHeader("Date", nowHttpDate());
+    res.addHeader("Server", "webserv");
+    res.addHeader("Content-Length", toString(static_cast<int>(contentLength)));
+    res.addHeader("Content-Type", contentType);
+    res.addHeader("Connection", "keep-alive");
 }
 
 std::string ResponseBuilder::escapeHtml(const std::string& input)
@@ -118,10 +156,9 @@ HttpResponse ResponseBuilder::buildRedirectResponse(const Location& location)
     HttpResponse res;
     res.setStatusCode(location.redirect_code);
 	res.setReasonPhrase(resolveReasonPhrase(location.redirect_code));
-    res.addHeader("Location", location.redirect_target);
     res.setBody("<html><body>Redirecting to <a href=\"" + escapeHtml(location.redirect_target) + "\">" + escapeHtml(location.redirect_target) + "</a></body></html>");
-    res.addHeader("Content-Length", toString(res.getBody().size()));
-    res.addHeader("Content-Type", "text/html");
+    applyStandardHeaders(res, res.getBody().size(), "text/html");
+    res.addHeader("Location", location.redirect_target);
     return res;
 }
 
@@ -132,9 +169,7 @@ HttpResponse ResponseBuilder::buildSimpleResponse(int statusCode, const std::str
     res.setStatusCode(statusCode);
     res.setReasonPhrase(resolveReasonPhrase(statusCode));
     res.setBody(body);
-
-    res.addHeader("Content-Length", toString(body.size()));
-    res.addHeader("Content-Type", contentType);
+    applyStandardHeaders(res, body.size(), contentType);
 
     return res;
 }
@@ -146,8 +181,7 @@ HttpResponse ResponseBuilder::buildFileResponse(const std::string& fileContent, 
     res.setStatusCode(200);
 	res.setReasonPhrase(resolveReasonPhrase(res.getStatusCode()));
     res.setBody(fileContent);
-    res.addHeader("Content-Length", toString(fileContent.size()));
-    res.addHeader("Content-Type", getMimeType(filePath));
+    applyStandardHeaders(res, fileContent.size(), getMimeType(filePath));
     return res;
 }
 
@@ -159,27 +193,4 @@ HttpResponse ResponseBuilder::buildAutoindexResponse(const std::string& path, co
         body << "<li>" << escapeHtml(entries[i]) << "</li>";
     body << "</ul></body></html>";
     return buildSimpleResponse(200, body.str(), "text/html");
-}
-
-HttpResponse ResponseBuilder::buildCgiResponse(int statusCode,
-                                               const std::map<std::string, std::string>& headers,
-                                               const std::string& body)
-{
-    HttpResponse res;
-    res.setStatusCode(statusCode);
-    res.setReasonPhrase(resolveReasonPhrase(statusCode));
-    res.setBody(body);
-
-    for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
-    {
-        if (it->first == "Status")
-            continue;
-        res.addHeader(it->first, it->second);
-    }
-
-    res.addHeader("Content-Length", toString(body.size()));
-    if (res.getHeaders().find("Content-Type") == res.getHeaders().end())
-        res.addHeader("Content-Type", "text/html");
-
-    return res;
 }
