@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upload</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 40px; line-height: 1.4; }
+    h1 { margin-bottom: 12px; }
+    form { max-width: 520px; }
+    input[type="file"] { display: block; margin: 10px 0 14px; }
+    button { padding: 10px 14px; cursor: pointer; }
+    .msg { margin-top: 16px; padding: 10px 12px; border-radius: 6px; }
+    .ok { background: #e8fff0; border: 1px solid #2e8b57; }
+    .err { background: #ffecec; border: 1px solid #c0392b; }
+    .links { margin-top: 18px; }
+    code { background: #f3f3f3; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Fazer upload</h1>
+
+  <!--
+    Envia para o endpoint /upload (o teu location com upload on; upload_store www/uploads;)
+    enctype multipart/form-data é obrigatório para upload de ficheiros.
+  -->
+  <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+    <label for="file">Escolhe um ficheiro (imagem ou texto):</label>
+    <input id="file" name="file" type="file" accept="image/*,.txt" required />
+
+    <button type="submit">Enviar</button>
+  </form>
+
+  <div id="message" class="msg" style="display:none;"></div>
+
+  <div class="links">
+    <a href="/uploads">Ver uploads</a> |
+    <a href="/">Voltar ao início</a>
+  </div>
+
+  <script>
+    (function () {
+      const form = document.getElementById("uploadForm");
+      const fileInput = document.getElementById("file");
+      const msg = document.getElementById("message");
+
+      function showMessage(type, text) {
+        msg.className = "msg " + (type === "ok" ? "ok" : "err");
+        msg.textContent = text;
+        msg.style.display = "block";
+      }
+
+      // Fazemos upload via fetch para conseguir mostrar sucesso/erro sem depender do HTML de resposta do servidor.
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+          showMessage("err", "Seleciona um ficheiro antes de enviar.");
+          return;
+        }
+
+        const fd = new FormData();
+        // O campo chama-se "file" (tem de bater com o name do input)
+        fd.append("file", fileInput.files[0]);
+
+        try {
+          const res = await fetch(form.action, {
+            method: "POST",
+            body: fd
+          });
+
+          if (res.ok) {
+            showMessage("ok", "Upload concluído com sucesso. O ficheiro deve estar em www/uploads.");
+            form.reset();
+          } else {
+            showMessage("err", `Erro no upload (HTTP ${res.status}).`);
+          }
+        } catch (err) {
+          showMessage("err", "Erro de rede ao tentar fazer upload.");
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -46,6 +46,7 @@ int HttpRequest::extractFirstFilePartToBody(std::vector<std::string> multipart){
         filePart = *it;
         break;
     }
+    
     if(filePart.empty()){
         errorMsg = "Multipart body: Missing file part";
         return 400;
@@ -65,8 +66,7 @@ int HttpRequest::extractFirstFilePartToBody(std::vector<std::string> multipart){
         errorMsg = "Multipart body: Invalid format of file name";
         return 400;
     }
-    this->file.filename = filePart.substr(start, end - start);
-    
+    this->file.filename = sanitizeFilename(filePart.substr(start, end - start));
     //content type
     key = "Content-Type: ";
     start = filePart.find(key);
@@ -91,11 +91,10 @@ int HttpRequest::extractFirstFilePartToBody(std::vector<std::string> multipart){
         errorMsg = "Multipart body: Missing file data";
         return 400;
     }
-    start += key.size();
+    start += 4;
 
-    end = filePart.size();
+    end = filePart.find_last_of(NEWLINE) - 1;
     this->file.data = filePart.substr(start, end - start);
-    
     return 0;
 }
 
@@ -123,9 +122,15 @@ void HttpRequest::parseRequest(const std::string& recvBuffer, size_t bodyMaxSize
     this->statusCode = 0;
     std::string requestBuffer(recvBuffer);
 
+    if(requestSize > 0 && requestBuffer.size() >= requestSize)
+        requestBuffer.erase(0, requestSize);
+    
     this->statusCode = readStartLine(requestBuffer);
+    
     this->statusCode = readHeaders(requestBuffer);
+    
     this->statusCode = readContentLengthBody(requestBuffer, bodyMaxSize);
+    
     this->statusCode = readChunkedBody(requestBuffer, bodyMaxSize);
     
     if(detectMultipartAndBoundary()){
@@ -135,6 +140,7 @@ void HttpRequest::parseRequest(const std::string& recvBuffer, size_t bodyMaxSize
     if(this->statusCode == 1)
         this->status = Incomplete;
     else if(this->statusCode == 0){
+        // printRequest();
         this->status = Complete;
     }
     else{
@@ -142,11 +148,11 @@ void HttpRequest::parseRequest(const std::string& recvBuffer, size_t bodyMaxSize
     }
 }
 
-void HttpRequest::printRequest(){
+void HttpRequest::printRequest() const{
     std::cout << "\n-------REQUEST-BEGIN--------" << std::endl;
     std::cout << getMethod() << " " << getUri() << " " << getVersion() << std::endl;
 
-    for(std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); it++){
+    for(std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); it++){
         std::cout << it->first << ": " << it->second << std::endl;
     }
 

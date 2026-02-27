@@ -33,7 +33,9 @@ int HttpRequest::readContentLengthBody(std::string& requestBuffer, size_t bodyMa
     if(requestBuffer.size() < bodySize)
         return 1;
     
-    this->setBody(requestBuffer.substr(0, bodySize));
+    this->body = requestBuffer.substr(0, bodySize);
+    requestBuffer.erase(0, bodySize);
+
     this->requestSize += bodySize;
     return 0;
 }
@@ -52,6 +54,8 @@ int HttpRequest::readChunkedBody(std::string& requestBuffer, size_t bodyMaxSize)
         return 413;
     }
     this->setBody(requestBuffer.substr(0, pos));
+    requestBuffer.erase(0, pos + 4);
+
     this->requestSize += pos + 4;
     return 0;
 }
