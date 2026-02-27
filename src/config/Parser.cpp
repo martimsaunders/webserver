@@ -376,6 +376,10 @@ static LocationConfig defaultLocationConfig(std::string const &path, ServerConfi
 	loc.has_redirect = false;
 	loc.upload_enabled = false;
 
+	// Variables related to cgi
+	loc.is_cgi = false;
+	loc.interpreter_path = "";
+
 	// Inherit from server
 	loc.client_max_body_size = srv.client_max_body_size;
 	loc.root = srv.root;
