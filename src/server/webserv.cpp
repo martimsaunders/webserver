@@ -337,8 +337,9 @@ void Webserv::eventLoop(){
 			// CGI fds
 			//-----------------------------------------------------------------
 			if (isCgiFd(fd)){
-				// If there is an error/hup/navl, mark this fd (and the ones from the client) to close
-				if (re & (POLLHUP | POLLERR | POLLNVAL)){
+				// Fatal CGI fd errors: mark this fd (and sibling CGI fds) to close.
+				// Note: POLLHUP is expected on pipe EOF and is handled below via read().
+				if (re & (POLLERR | POLLNVAL)){
 					std::map<int, CgiFdInfo>::iterator fit = _cgiFds.find(fd);
 					if (fit != _cgiFds.end()){
 						int client_fd = fit->second.client_fd;
@@ -369,7 +370,7 @@ void Webserv::eventLoop(){
 					}
 					continue;
 				}
-				if (re & POLLIN) handleCgiRead(fd);
+				if (re & (POLLIN | POLLHUP)) handleCgiRead(fd);
 				if (re & POLLOUT) handleCgiWrite(fd);
 				continue;
 			}

@@ -286,7 +286,12 @@ RequestResult CGIHandler::startCgi(const HttpRequest& request,
     envp.push_back(NULL);
 
     // argv for execve (interpreter + script).
-    std::vector<char*> argv = buildCgiArgv(interpreterPath, scriptPath);
+    // Child chdirs to scriptDir, so pass basename to avoid duplicating relative dirs.
+    size_t scriptSlashPos = scriptPath.find_last_of('/');
+    std::string scriptExecPath = (scriptSlashPos == std::string::npos)
+        ? scriptPath
+        : scriptPath.substr(scriptSlashPos + 1);
+    std::vector<char*> argv = buildCgiArgv(interpreterPath, scriptExecPath);
 
     // Create stdout pipe always; stdin pipe only for POST.
     const bool isPost = (request.getMethod() == "POST");
