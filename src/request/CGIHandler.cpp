@@ -112,11 +112,21 @@ bool CGIHandler::parseCgiOutput(const std::string& raw,
 {
     // Split CGI output into header block and body block.
     // Accept CRLF and LF-only separators for robustness.
-    size_t sep = raw.find("\r\n\r\n");
-    size_t sepLen = 4;
-    if (sep == std::string::npos)
+    const size_t crlfSep = raw.find("\r\n\r\n");
+    const size_t lfSep = raw.find("\n\n");
+    size_t sep = std::string::npos;
+    size_t sepLen = 0;
+
+    // Pick the earliest valid separator to avoid matching CRLF sequences
+    // that may appear later inside body content (e.g. multipart payloads).
+    if (crlfSep != std::string::npos && (lfSep == std::string::npos || crlfSep < lfSep))
     {
-        sep = raw.find("\n\n");
+        sep = crlfSep;
+        sepLen = 4;
+    }
+    else if (lfSep != std::string::npos)
+    {
+        sep = lfSep;
         sepLen = 2;
     }
     // Missing separator means malformed CGI response format.

@@ -12,10 +12,10 @@ class ResponseBuilder
     	static int statusFromInfo(const FileInfo& info);
 		static std::string escapeHtml(const std::string& input);
 		static std::string getMimeType(const std::string& path);
-		static std::string resolveReasonPhrase(int statusCode);
 	    static std::string loadErrorPage(int statusCode, const ServerConfig& serverConfig);
 	
 	public:
+		static std::string resolveReasonPhrase(int statusCode);
 		static HttpResponse buildErrorResponse(int statusCode, const ServerConfig& serverConfig);
 		static HttpResponse buildErrorResponse(const FileInfo& info, const ServerConfig& serverConfig);
 		static HttpResponse buildRedirectResponse(const Location& location);

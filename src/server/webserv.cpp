@@ -680,7 +680,7 @@ void Webserv::handleCgiRead(int cgi_fd){
 		int statusCode = 200;
 		std::map<std::string, std::string> headers;
 		std::string body;
-
+		
 		CGIHandler h;
 		if (!h.parseCgiOutput(c.req_res.cgiRawOutput, statusCode, headers, body)){
 			c.out = ResponseBuilder::buildErrorResponse(502, _config.servers[c.server_index]).toString();
@@ -698,7 +698,7 @@ void Webserv::handleCgiRead(int cgi_fd){
 
 			// Build HTTP response headers in canonical order.
 			std::ostringstream oss;
-			oss << "HTTP/1.1 " << statusCode << "\r\n";
+			oss << "HTTP/1.1 " << statusCode << " " << ResponseBuilder::resolveReasonPhrase(statusCode) << "\r\n";
 			oss << "Date: " << nowHttpDate() << "\r\n";
 			oss << "Server: webserv\r\n";
 			oss << "Content-Length: " << body.size() << "\r\n";
