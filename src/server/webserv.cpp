@@ -3,6 +3,7 @@
 #include "../../inc/request/RequestHandler.hpp"
 #include "../../inc/response/HttpResponse.hpp"
 #include "../../inc/response/ResponseBuilder.hpp"
+#include "../../inc/server/Logger.hpp"
 #include <iostream>
 #include <cstring>
 #include <cerrno>
@@ -132,6 +133,7 @@ void Webserv::run(){
 	// Ignore Ctrl+Z (optional)
 	std::signal(SIGTSTP, SIG_IGN);
 
+	Logger::init("logs/webserv.log");
 	setupListening();
 	eventLoop();
 }
@@ -172,12 +174,7 @@ void Webserv::setupListening(){
 		_listens[fd] = ls;
 
 		addPollFd(fd, POLLIN);
-		std::cout << "Listening on ";
-
-		// Simple log
-		if (sc.host.empty()) std::cout << "0.0.0.0";
-		else std::cout << sc.host;
-		std::cout << ":" << sc.port << " (server_index=" << i << ")" << std::endl;
+		Logger::listen(sc.host, sc.port, i);
 	}
 }
 
@@ -286,7 +283,7 @@ void Webserv::eventLoop(){
 		// Graceful shutdown via signals.
 		if (g_stop){
 			closeAll();
-			std::cout << "Shutting down server gracefully..." << std::endl;
+			Logger::shutdownMsg("Shutting down server peacefully...");
 			return;
 		}
 		if (_pfds.empty())
@@ -304,9 +301,17 @@ void Webserv::eventLoop(){
 		}
 
 		// Sets of fds to remove (remove outside loops to avoid invalidating iterators).
-		std::set<int> toRemove;
+		// Sets of fds to remove with reason (remove outside loops to avoid invalidating iterators).
 		std::set<int> toRemoveCgi;
-		std::set<int> toRemoveListens;
+		std::map<int, std::string> toRemove;
+		std::map<int, std::string> toRemoveListens;
+
+		struct InsertReason{
+			static void add(std::map<int, std::string> &m, int fd, std::string const &reason){
+				if (m.find(fd) == m.end())
+					m[fd] = reason;
+			}
+		};
 
 		//-----------------------------------------------------------------
 		// Per-client timeouts (tick-based)
@@ -317,13 +322,13 @@ void Webserv::eventLoop(){
 			// While CGI is running, uses its own timeout
 			if (c.req_res.deferred && c.req_res.cgi.active){
 				if ((g_tick - c.las_activity_tick) > CGI_TIMEOUT_TICKS)
-					toRemove.insert(cit->first);
+					InsertReason::add(toRemove, cit->first, "cgi timeout");
 				continue;
 			}
 
 			// If we have been writing for too long without progress -> remove
 			if (!c.out.empty() && (g_tick - c.las_write_progress_tick) > WRITE_STALL_TICKS){
-				toRemove.insert(cit->first);
+				InsertReason::add(toRemove, cit->first, "write stall timeout");
 				continue;
 			}
 
@@ -331,7 +336,7 @@ void Webserv::eventLoop(){
 			// treat as "waiting for full header/request".
 			if (!c.in.empty() && c.out.empty()){
 				if ((g_tick - c.las_activity_tick) > HEADER_TIMEOUT_TICKS)
-					toRemove.insert(cit->first);
+					InsertReason::add(toRemove, cit->first, "header timeout");
 				continue;
 			}
 
@@ -341,11 +346,11 @@ void Webserv::eventLoop(){
 			if (c.in.empty() && c.out.empty()){
 				if (!c.has_completed_request){
 					if ((g_tick - c.las_activity_tick) > CONNECT_IDLE_TICKS)
-						toRemove.insert(cit->first);
+						InsertReason::add(toRemove, cit->first, "connect idle timeout");
 				}
 				else{
 					if ((g_tick - c.las_activity_tick) > KEEPALIVE_TICKS)
-						toRemove.insert(cit->first);
+						InsertReason::add(toRemove, cit->first, "keep-alive timeout");
 				}
 			}
 		}
@@ -409,7 +414,7 @@ void Webserv::eventLoop(){
 			if (isListenFd(fd)){
 				// Listen socket error -> remove it
 				if (re & (POLLHUP | POLLERR | POLLNVAL)){
-					toRemoveListens.insert(fd);
+					InsertReason::add(toRemoveListens, fd, "listen socket error (HUP/ERR/NVAL)");
 					continue;
 				}
 				// New connection -> accept in a loop
@@ -423,7 +428,7 @@ void Webserv::eventLoop(){
 			else{
 				// Client socket error -> remove it
 				if (re & (POLLHUP | POLLERR | POLLNVAL)){
-					toRemove.insert(fd);
+					InsertReason::add(toRemove, fd, "client socket error (HUP/ERR/NVAL)");
 					continue;
 				}
 
@@ -434,7 +439,7 @@ void Webserv::eventLoop(){
 				// If marked to close and no pending output -> remove
 				std::map<int , Client>::iterator it = _clients.find(fd);
 				if (it != _clients.end() && it->second.should_close && it->second.out.empty()){
-					toRemove.insert(fd);
+					InsertReason::add(toRemove, fd, "client marked close");
 					continue;
 				}
 
@@ -445,7 +450,7 @@ void Webserv::eventLoop(){
 				// If marked to close and no pending output -> remove
 				it = _clients.find(fd);
 				if (it != _clients.end() && it->second.should_close && it->second.out.empty())
-					toRemove.insert(fd);
+					InsertReason::add(toRemove, fd, "client marked close");
 			}
 		}
 		//-----------------------------------------------------------------
@@ -464,12 +469,12 @@ void Webserv::eventLoop(){
 			_cgiFds.erase(cgi_fd);
 		}
 
-		for (std::set<int>::iterator it = toRemove.begin(); it != toRemove.end(); it++)
-			removeClient(*it);
+		for (std::map<int, std::string>::iterator it = toRemove.begin(); it != toRemove.end(); it++)
+			removeClient(it->first, it->second);
 
-		for (std::set<int>::iterator it = toRemoveListens.begin(); it != toRemoveListens.end(); it++){
-			removeListen(*it);
-			std::cout << "Closed listen_fd=" << *it << std::endl;
+		for (std::map<int, std::string>::iterator it = toRemoveListens.begin(); it != toRemoveListens.end(); it++){
+			Logger::closeListen(it->second, it->first);
+			removeListen(it->first);
 
 			// If there are no listen sockets left, the server cannot serve anymore.
 			if (_listens.empty()){
@@ -541,7 +546,7 @@ void Webserv::acceptAll(int listen_fd){
 		_clients[client_fd] = c;
 		addPollFd(client_fd, POLLIN); 
 
-		std::cout << "Accepted client fd=" << client_fd << " on listen_fd=" << listen_fd << std::endl;
+		Logger::accept(client_fd, listen_fd);
 	}
 }
 
@@ -685,6 +690,8 @@ void Webserv::handleCgiRead(int cgi_fd){
 		if (!h.parseCgiOutput(c.req_res.cgiRawOutput, statusCode, headers, body)){
 			c.out = ResponseBuilder::buildErrorResponse(502, _config.servers[c.server_index]).toString();
 			c.should_close = true;
+			c.log.status = 502;
+			c.log.bytes = c.out.size();
 		}
 		else{
 			// Determine final Content-Type from CGI output (fallback to text/html).
@@ -703,7 +710,7 @@ void Webserv::handleCgiRead(int cgi_fd){
 			oss << "Server: webserv\r\n";
 			oss << "Content-Length: " << body.size() << "\r\n";
 			oss << "Content-Type: " << contentType << "\r\n";
-			oss << "Connection: keep-alive\r\n";
+			oss << "Connection: " << (c.should_close ? "close" : "keep-alive") << "\r\n";
 
 			// Append CGI-specific headers, excluding standard managed headers.
 			for (std::map<std::string, std::string>::const_iterator hit = headers.begin(); hit != headers.end(); ++hit){
@@ -719,6 +726,9 @@ void Webserv::handleCgiRead(int cgi_fd){
 			oss << "\r\n" << body;
 
 			c.out = oss.str();
+
+			c.log.status = statusCode;
+			c.log.bytes = c.out.size();
 		}
 
 		c.req_res.deferred = false;
@@ -780,6 +790,10 @@ void Webserv::handleClientRead(int fd){
 
 	// Complete request -> generate response
 	else if (client.parser.getStatus() == HttpRequest::Complete){
+		// Save request info BEFORE resetting parser
+		client.log.method = client.parser.getMethod();
+		client.log.target = client.parser.getUri();
+
 		RequestResult result = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
 
 		client.req_res = result;
@@ -797,6 +811,11 @@ void Webserv::handleClientRead(int fd){
 		}
 
 		client.out = result.response.toString();
+
+		// status/bytes of the RESPONSE (not parser)
+		client.log.status = result.response.getStatusCode();
+		client.log.bytes = client.out.size();
+
 		client.las_write_progress_tick = g_tick;
 		setPollEvents(fd, POLLOUT);
 
@@ -805,7 +824,11 @@ void Webserv::handleClientRead(int fd){
 
 	// Parsing error -> build error response and close
 	HttpResponse err = ResponseBuilder::buildErrorResponse(client.parser.getStatusCode(), _config.servers[client.server_index]);
+	client.log.method = client.parser.getMethod();
+	client.log.target = client.parser.getUri();
 	client.out = err.toString();
+	client.log.status = err.getStatusCode();
+	client.log.bytes = client.out.size();
 	client.should_close = true;
 	client.las_write_progress_tick = g_tick;
 	client.has_completed_request = true;
@@ -853,6 +876,9 @@ void Webserv::handleClientWrite(int fd){
 		return ;
 	}
 
+	// Response finished -> log now (sent complete)
+	Logger::response(fd, client.log, client.listen_fd);
+
 	// Response finished
 	if (client.should_close)
 		return;
@@ -866,6 +892,10 @@ void Webserv::handleClientWrite(int fd){
 		if (client.parser.getStatus() == HttpRequest::Incomplete)
 			return;
 		else if (client.parser.getStatus() == HttpRequest::Complete){
+			// Save request info BEFORE resetting parser
+			client.log.method = client.parser.getMethod();
+			client.log.target = client.parser.getUri();
+
 			RequestResult result = RequestHandler::handleRequest(client.parser, _config.servers[client.server_index]);
 			client.req_res = result;
 			client.in.erase(0, client.parser.getRequestSize());
@@ -877,12 +907,21 @@ void Webserv::handleClientWrite(int fd){
 			}
 
 			client.out = result.response.toString();
+			client.log.status = result.response.getStatusCode();
+			client.log.bytes = client.out.size();
+
 			client.las_write_progress_tick = g_tick;
 			setPollEvents(fd, POLLOUT);
 			return ;
 		}
 		HttpResponse err = ResponseBuilder::buildErrorResponse(client.parser.getStatusCode(), _config.servers[client.server_index]);
+		client.log.method = client.parser.getMethod();
+		client.log.target = client.parser.getUri();
+
 		client.out = err.toString();
+		client.log.status = err.getStatusCode();
+		client.log.bytes = client.out.size();
+
 		client.should_close = true;
 		client.las_write_progress_tick = g_tick;
 		setPollEvents(fd, POLLOUT);
@@ -894,7 +933,7 @@ void Webserv::handleClientWrite(int fd){
 // removeClient / removeListen
 //========================================================================
 // Remove a client: remove from poll, close socket, erase from map.
-void Webserv::removeClient(int fd){
+void Webserv::removeClient(int fd, std::string const &reason){
 	int listen_fd = -1;
 	std::map<int, Client>::iterator it = _clients.find(fd);
 	if (it != _clients.end())
@@ -906,10 +945,7 @@ void Webserv::removeClient(int fd){
 	if (it != _clients.end())
 		_clients.erase(it);
 
-	std::cout << "Close client fd=" << fd;
-	if (listen_fd != -1)
-		std::cout << " on listen_fd=" << listen_fd;
-	std::cout << std::endl;
+	Logger::closeClient(fd, reason, listen_fd);
 }
 
 // Remove a listen socket: remove from poll, close socket, erase from map.

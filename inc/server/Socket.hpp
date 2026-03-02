@@ -3,6 +3,16 @@
 #include "../request/HttpRequest.hpp"
 #include "../request/RequestResult.hpp"
 
+struct ResponseLog
+{
+	std::string method;
+	std::string target;
+	int			status;
+	size_t		bytes;
+
+	ResponseLog(): method(), target(), status(0), bytes(0){}
+};
+
 struct		Client
 {
 	int		fd;
@@ -19,6 +29,7 @@ struct		Client
 	unsigned long las_activity_tick;
 	unsigned long las_write_progress_tick;
 	RequestResult req_res;
+	ResponseLog log;
 
 };
 

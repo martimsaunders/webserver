@@ -6,6 +6,7 @@ src/config/testConfig.cpp src/config/Tokenizer.cpp \
 src/config/ValidateConfig.cpp src/config/ServerConfig.cpp \
 src/config/LocationConfig.cpp \
 src/server/webserv.cpp \
+src/server/Logger.cpp \
 src/internal/FileService.cpp \
 src/request/HttpRequest.cpp src/request/RequestHandler.cpp src/request/bodyParsing.cpp \
 src/request/firstLineParsing.cpp src/request/headersParsing.cpp \
