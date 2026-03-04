@@ -1,8 +1,15 @@
+- httpRequest
+	- large URI value -> 414 URI Too Long
+	- invalid format -> 400 Bad request
+	- invlid characters -> 400 Bad request
+	- missing values -> 400 Bad request
+
 - no location matched URI -> 404 Not Found
 - parsed method is unknown (GET/POST/DELETE mismatch) -> 405 Method Not Allowed
 - method not allowed by location flags -> 405 Method Not Allowed
 - location has redirect configured -> redirect response (status from redirect config, typically 302)
 - resolved path is unsafe/invalid (empty) -> 403 Forbidden
+- if is_cgi (go to cgi and ignore next checks)
 - filesystem lookup for resolved path failed -> mapped file error
 	- FILE_NOT_FOUND -> 404 Not Found
 	- FILE_FORBIDDEN -> 403 Forbidden
@@ -43,8 +50,19 @@
 
 - method switch default case (unexpected enum path) -> 405 Method Not Allowed
 
-- httpRequest
-	- large URI value -> 414 URI Too Long
-	- invalid format -> 400 Bad request
-	- invlid characters -> 400 Bad request
-	- missing values -> 400 Bad request
+- location is CGI-enabled -> startCgi(...)
+	- request method is not GET/POST -> 405 Method Not Allowed
+	- script extension is not supported (.py only) -> 501 Not Implemented
+	- interpreter path missing/invalid/non-executable -> 500 Internal Server Error
+	- target script not found -> 404 Not Found
+	- target script forbidden/not readable -> 403 Forbidden
+	- target script other file error -> 500 Internal Server Error
+	- pipe/fork/startup failure -> 500 Internal Server Error
+	- startup succeeds -> deferred CGI processing (no immediate HTTP error code)
+
+	- deferred CGI processing in webserv poll loop
+		- CGI fd fatal error (POLLERR/POLLNVAL) -> 502 Bad Gateway
+		- stdout read reaches EOF
+			- parseCgiOutput fails (malformed CGI response) -> 502 Bad Gateway
+			- parseCgiOutput succeeds -> return CGI status code (default 200 if Status header absent)
+				- examples: 200 OK / 4xx / 5xx depending on CGI Status header
