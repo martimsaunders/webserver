@@ -1,0 +1,1 @@
+print("THIS IS NOT CGI FORMAT")

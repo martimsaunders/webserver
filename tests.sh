@@ -78,3 +78,13 @@ curl -i -X POST \
 
 # ---------- PATH_INFO addition script ----------
 curl -i "http://127.0.0.1:8080/cgi-bin/add_pathinfo.py/7/35"
+
+
+# malformed CGI output (no valid headers/body separator)
+curl -i "http://127.0.0.1:8080/cgi-bin/tests/bad_output.py"
+
+# non-zero exit
+curl -i "http://127.0.0.1:8080/cgi-bin/tests/exit1.py"
+
+# infinite loop (client-side timeout to avoid hanging terminal)
+curl -i "http://127.0.0.1:8080/cgi-bin/tests/loop.py"
