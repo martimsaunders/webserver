@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>webserver - delete file</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 40px; line-height: 1.4; }
+    h1 { margin-bottom: 16px; }
+
+    label { display: block; margin: 12px 0 6px; }
+    input[type="text"] { width: min(520px, 100%); padding: 10px; font-size: 1rem; }
+
+    button { margin-top: 12px; padding: 10px 14px; font-size: 1rem; cursor: pointer; }
+
+    .msg { margin-top: 14px; padding: 10px 12px; border-radius: 6px; display: none; }
+    .msg.ok { background: #e8f6ee; border: 1px solid #78c08f; color: #1e6b36; }
+    .msg.err { background: #fdecec; border: 1px solid #f0a0a0; color: #8b1a1a; }
+
+    .hint { color: #555; font-size: 0.95rem; }
+    .links { margin-top: 18px; }
+    a { text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Delete file</h1>
+
+  <p class="hint">
+    Type only the file name (e.g. <code>photo.png</code> or <code>text.txt</code>).
+    A <code>DELETE</code> request will be sent to <code>/delete/&lt;file-name&gt;</code>.
+  </p>
+
+  <form id="deleteForm">
+    <label for="filename">File name:</label>
+    <input id="filename" name="filename" type="text" placeholder="e.g. image.png" required />
+    <button id="deleteBtn" type="submit">Delete</button>
+  </form>
+
+  <div id="message" class="msg"></div>
+
+  <div class="links">
+    <a href="/uploads">View uploads</a> |
+    <a href="/">Back to home</a>
+  </div>
+
+  <script>
+    (function () {
+      const form = document.getElementById("deleteForm");
+      const input = document.getElementById("filename");
+      const btn = document.getElementById("deleteBtn");
+      const msg = document.getElementById("message");
+
+      function showMessage(type, text) {
+        msg.className = "msg " + (type === "ok" ? "ok" : "err");
+        msg.textContent = text;
+        msg.style.display = "block";
+      }
+
+      function sanitizeFilename(name) {
+        // Basic safety: block path traversal and path separators
+        const trimmed = (name || "").trim();
+        if (!trimmed) return "";
+
+        // do not allow ../, /, \ (prevents attempts to delete outside /uploads)
+        if (trimmed.includes("..") || trimmed.includes("/") || trimmed.includes("\\")) return "";
+
+        return trimmed;
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        msg.style.display = "none";
+
+        const filename = sanitizeFilename(input.value);
+        if (!filename) {
+          showMessage("err", "Invalid name. Use only the file name (no folders, /, \\, or ..).");
+          return;
+        }
+
+        const sure = confirm(`Are you sure you want to delete "${filename}"?`);
+        if (!sure) return;
+
+        btn.disabled = true;
+
+        try {
+          // DELETE /delete/<file-name>
+          // encodeURIComponent avoids issues with spaces and special chars
+          const url = `/delete/${encodeURIComponent(filename)}`;
+
+          const res = await fetch(url, { method: "DELETE" });
+
+          if (res.ok) {
+            showMessage("ok", `File "${filename}" deleted successfully.`);
+            form.reset();
+          } else if (res.status === 404) {
+            showMessage("err", `Not found: "${filename}". (HTTP 404)`);
+          } else if (res.status === 405) {
+            showMessage("err", "Method not allowed (HTTP 405). Check allow_methods GET DELETE in /delete.");
+          } else {
+            showMessage("err", `Error deleting "${filename}". (HTTP ${res.status})`);
+          }
+        } catch (err) {
+          showMessage("err", "Network error while trying to delete the file.");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -18,24 +18,20 @@
   </style>
 </head>
 <body>
-  <h1>Fazer upload</h1>
+  <h1>Upload file</h1>
 
-  <!--
-    Envia para o endpoint /upload (o teu location com upload on; upload_store www/uploads;)
-    enctype multipart/form-data é obrigatório para upload de ficheiros.
-  -->
   <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
-    <label for="file">Escolhe um ficheiro (imagem ou texto):</label>
-    <input id="file" name="file" type="file" accept="image/*,.txt" required />
+    <label for="file">Choose a file (image or text):</label>
+    <input id="file" name="file" type="file" required />
 
-    <button type="submit">Enviar</button>
+    <button type="submit">Send</button>
   </form>
 
   <div id="message" class="msg" style="display:none;"></div>
 
   <div class="links">
-    <a href="/uploads">Ver uploads</a> |
-    <a href="/">Voltar ao início</a>
+    <a href="/uploads">View uploads</a> |
+    <a href="/">Back to home</a>
   </div>
 
   <script>
@@ -50,17 +46,15 @@
         msg.style.display = "block";
       }
 
-      // Fazemos upload via fetch para conseguir mostrar sucesso/erro sem depender do HTML de resposta do servidor.
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
         if (!fileInput.files || fileInput.files.length === 0) {
-          showMessage("err", "Seleciona um ficheiro antes de enviar.");
+          showMessage("err", "Select a file before sending.");
           return;
         }
 
         const fd = new FormData();
-        // O campo chama-se "file" (tem de bater com o name do input)
         fd.append("file", fileInput.files[0]);
 
         try {
@@ -70,13 +64,13 @@
           });
 
           if (res.ok) {
-            showMessage("ok", "Upload concluído com sucesso. O ficheiro deve estar em www/uploads.");
+            showMessage("ok", "Upload completed successfully. The file should be in www/uploads.");
             form.reset();
           } else {
-            showMessage("err", `Erro no upload (HTTP ${res.status}).`);
+            showMessage("err", `Upload error (HTTP ${res.status}).`);
           }
         } catch (err) {
-          showMessage("err", "Erro de rede ao tentar fazer upload.");
+          showMessage("err", "Network error while trying to upload.");
         }
       });
     })();
