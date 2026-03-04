@@ -117,6 +117,3 @@ AI tools were used as development support, specifically for:
 - clarifying protocol details (status codes, headers, CGI semantics)
 - discussing edge cases and expected behavior for request parsing, uploads, and CGI handling
 - proposing refactor strategies and debugging hypotheses during integration
-- drafting and improving documentation text (including README structure/content)
-
-AI was not used as an autonomous code generator for final decisions. Final architecture choices, code integration, validation, and project responsibility remain with the project authors.
