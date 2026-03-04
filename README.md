@@ -107,8 +107,6 @@ curl -i "http://127.0.0.1:8080/cgi-bin/get_info.py?name=test"
   https://www.rfc-editor.org/rfc/rfc7231
 - RFC 3875: CGI Version 1.1  
   https://www.rfc-editor.org/rfc/rfc3875
-- NGINX documentation (behavior comparison baseline)  
-  https://nginx.org/en/docs/
 - MDN HTTP reference  
   https://developer.mozilla.org/en-US/docs/Web/HTTP
 
