@@ -4,11 +4,14 @@
 #include <ctime>
 #include <sstream>
 
+
 std::ofstream Logger::_file;
 
 Logger::Logger(){}
 
 bool Logger::init(std::string const &path){
+	if (LOGGER == false)
+		return (false);
 	if (_file.is_open())
 		return (true);
 	_file.open(path.c_str(), std::ios::out | std::ios::app);

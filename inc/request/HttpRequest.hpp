@@ -77,7 +77,7 @@ class HttpRequest
 		std::string body;
 		std::string errorMsg;
 		int statusCode;
-		int requestSize;
+		size_t requestSize;
 		ParseStatus status;
 		RequestState state;
 		bool isMultipart; // request Content-Type is multipart/form-data.

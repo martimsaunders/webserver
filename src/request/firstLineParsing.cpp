@@ -12,7 +12,7 @@ static bool isUriChar(char c){
 bool HttpRequest::validateMethod(const std::vector<std::string>& startLine){
     //invalid method
     if(startLine[0] != "GET" && startLine[0] != "POST" && startLine[0] != "DELETE" && startLine[0] != "HEAD" &&
-        startLine[0] != "PUT  " && startLine[0] != "OPTIONS" && startLine[0] != "PATCH"){
+        startLine[0] != "PUT" && startLine[0] != "OPTIONS" && startLine[0] != "PATCH"){
         errorMsg = "Method: Invalid Method";
         statusCode = 405;
         return false;

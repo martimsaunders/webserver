@@ -3,6 +3,8 @@
 #include <fstream>
 #include "Socket.hpp"
 
+#define LOGGER false
+
 class Logger
 {
 	public:

@@ -24,7 +24,7 @@
 #define CONNECT_IDLE_SECONDS 15
 #define HEADER_TIMEOUT_SECONDS 10
 #define KEEPALIVE_SECONDS 30
-#define CGI_TIMEOUT_SECONDS 30
+#define CGI_TIMEOUT_SECONDS 10
 
 static void terminateClientCgi(Client &c);
 

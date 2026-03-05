@@ -20,21 +20,6 @@ static std::string nowHttpDate()
     return std::string(buf);
 }
 
-static bool iequalsAscii(const std::string& a, const std::string& b)
-{
-    if (a.size() != b.size())
-        return false;
-    for (size_t i = 0; i < a.size(); ++i)
-    {
-        unsigned char ca = static_cast<unsigned char>(a[i]);
-        unsigned char cb = static_cast<unsigned char>(b[i]);
-        if (ca >= 'A' && ca <= 'Z') ca = static_cast<unsigned char>(ca - 'A' + 'a');
-        if (cb >= 'A' && cb <= 'Z') cb = static_cast<unsigned char>(cb - 'A' + 'a');
-        if (ca != cb)
-            return false;
-    }
-    return true;
-}
 
 static void applyStandardHeaders(HttpResponse& res, size_t contentLength, const std::string& contentType)
 {
@@ -124,7 +109,7 @@ std::string ResponseBuilder::loadErrorPage(int statusCode, const ServerConfig& s
     body << "<html><body><h1>"
          << statusCode << " "
          << resolveReasonPhrase(statusCode)
-         << "</h1></body></html>";
+         << "</h1></body></html>\r\n";
 
     return body.str();
 }
@@ -157,7 +142,7 @@ HttpResponse ResponseBuilder::buildRedirectResponse(const Location& location)
     HttpResponse res;
     res.setStatusCode(location.redirect_code);
 	res.setReasonPhrase(resolveReasonPhrase(location.redirect_code));
-    res.setBody("<html><body>Redirecting to <a href=\"" + escapeHtml(location.redirect_target) + "\">" + escapeHtml(location.redirect_target) + "</a></body></html>");
+    res.setBody("<html><body>Redirecting to <a href=\"" + escapeHtml(location.redirect_target) + "\">" + escapeHtml(location.redirect_target) + "</a></body></html>\r\n");
     applyStandardHeaders(res, res.getBody().size(), "text/html");
     res.addHeader("Location", location.redirect_target);
     return res;
@@ -192,6 +177,6 @@ HttpResponse ResponseBuilder::buildAutoindexResponse(const std::string& path, co
     body << "<html><body><h1>Index of " << path << "</h1><ul>";
     for (size_t i = 0; i < entries.size(); ++i)
         body << "<li>" << escapeHtml(entries[i]) << "</li>";
-    body << "</ul></body></html>";
+    body << "</ul></body></html>\r\n";
     return buildSimpleResponse(200, body.str(), "text/html");
 }

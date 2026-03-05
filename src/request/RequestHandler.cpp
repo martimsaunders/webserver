@@ -142,7 +142,7 @@ HttpResponse RequestHandler::handleGet(const Location* location,
             std::string body;
             if (!FileService::readFile(indexPath, body))
                 return ResponseBuilder::buildErrorResponse(403, serverConfig);
-            return ResponseBuilder::buildFileResponse(body, indexPath);
+            return ResponseBuilder::buildFileResponse(body + "\r\n", indexPath);
         }
 
 		// No usable index -> optional autoindex.
@@ -166,7 +166,7 @@ HttpResponse RequestHandler::handleGet(const Location* location,
         return ResponseBuilder::buildErrorResponse(403, serverConfig);
 
 	//return file (200)
-    return ResponseBuilder::buildFileResponse(body, path);
+    return ResponseBuilder::buildFileResponse(body + "\r\n", path);
 }
 
 
@@ -250,7 +250,7 @@ HttpResponse RequestHandler::handlePost(const Location* location,
         return ResponseBuilder::buildErrorResponse(500, serverConfig);}
 
 	//return file created succesfully (201)
-    return ResponseBuilder::buildSimpleResponse(201, "File uploaded successfully: " + targetPath, "text/plain");
+    return ResponseBuilder::buildSimpleResponse(201, "File uploaded successfully: " + targetPath + "\r\n", "text/plain");
 }
 
 HttpResponse RequestHandler::handleDelete(const Location* location,
@@ -273,5 +273,5 @@ HttpResponse RequestHandler::handleDelete(const Location* location,
 	if (!FileService::deleteFile(path)){
     	return ResponseBuilder::buildErrorResponse(500, serverConfig);}
 
-	return ResponseBuilder::buildSimpleResponse(200, "Deleted successfully", "text/plain");    
+	return ResponseBuilder::buildSimpleResponse(200, "Deleted successfully\r\n", "text/plain");    
 }
