@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <ctime>
 #include "../request/HttpRequest.hpp"
 #include "../request/RequestResult.hpp"
 
@@ -26,8 +27,8 @@ struct		Client
 	std::string in;
 	std::string out;
 	HttpRequest parser;
-	unsigned long las_activity_tick;
-	unsigned long las_write_progress_tick;
+	time_t las_activity_tick;
+	time_t las_write_progress_tick;
 	RequestResult req_res;
 	ResponseLog log;
 

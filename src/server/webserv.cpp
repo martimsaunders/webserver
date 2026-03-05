@@ -20,11 +20,13 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define WRITE_STALL_TICKS 10
-#define CONNECT_IDLE_TICKS 15
-#define HEADER_TIMEOUT_TICKS 10
-#define KEEPALIVE_TICKS 30
-#define CGI_TIMEOUT_TICKS 120
+#define WRITE_STALL_SECONDS 10
+#define CONNECT_IDLE_SECONDS 15
+#define HEADER_TIMEOUT_SECONDS 10
+#define KEEPALIVE_SECONDS 30
+#define CGI_TIMEOUT_SECONDS 30
+
+static void terminateClientCgi(Client &c);
 
 //========================================================================
 // Global loop state (signals + logical "tick")
@@ -32,8 +34,8 @@
 // Flag set by signal handlers to request a graceful shutdown.
 static volatile sig_atomic_t g_stop = 0;
 
-// Loop "tick" (increments every iteration). Used for simple timeouts.
-static unsigned long g_tick = 0;
+/* // Loop "tick" (increments every iteration). Used for simple timeouts.
+static unsigned long g_tick = 0; */
 
 // Signal handler: marks shutdown request (event loop checks and exits).
 static void handleStopSignal(int){
@@ -238,13 +240,13 @@ int Webserv::createListenFd(std::string const &host, int port){
 			continue;
 		}
 
-		if (listen(fd, 128) < 0){
+		if (listen(fd, SOMAXCONN) < 0){
 			close(fd);
 			fd = -1;
 			continue;
 		}
 
-		// Sucess
+		// Success
 		break;
 	}
 
@@ -258,15 +260,73 @@ int Webserv::createListenFd(std::string const &host, int port){
 
 // Close all sockets (clients + listens) and clear internal structures.
 void Webserv::closeAll(){
-	for (std::map<int, Client>::iterator it = _clients.begin(); it != _clients.end(); it++)
+	for (std::map<int, Client>::iterator it = _clients.begin(); it != _clients.end(); it++){
+		delPollFd(it->first);
 		close(it->first);
+	}	
 	_clients.clear();
 
-	for (std::map<int, ListenSocket>::iterator it = _listens.begin(); it != _listens.end(); it++)
+	for (std::map<int, ListenSocket>::iterator it = _listens.begin(); it != _listens.end(); it++){
+		delPollFd(it->first);
 		close(it->first);
+	}
 	_listens.clear();
 
+	// close CGI fds too
+	for (std::map<int, CgiFdInfo>::iterator it = _cgiFds.begin(); it != _cgiFds.end(); it++){
+		delPollFd(it->first);
+		close(it->first);
+	}
+	_cgiFds.clear();
+
 	_pfds.clear();
+}
+
+static void killAllCgi(std::map<int, Client> &clients){
+	for (std::map<int, Client>::iterator it = clients.begin(); it != clients.end(); it++){
+		pid_t pid = it->second.req_res.cgi.pid;
+		if (pid > 0)
+			kill(pid, SIGKILL);
+	}
+	for (std::map<int, Client>::iterator it = clients.begin(); it != clients.end(); it++){
+		pid_t pid = it->second.req_res.cgi.pid;
+		if (pid > 0){
+			pid_t r = waitpid(pid, NULL, WNOHANG);
+			if (r == pid || r < 0)
+				it->second.req_res.cgi.pid = -1;
+		}
+	}
+}
+
+void Webserv::markReapedPid(pid_t pid)
+{
+	for (std::map<int, Client>::iterator it = _clients.begin(); it != _clients.end(); it++)
+	{
+		Client &c = it->second;
+		if (c.req_res.cgi.pid == pid){
+			c.req_res.cgi.active = false;
+			c.req_res.deferred = false;
+			c.req_res.cgi.pid = -1;
+			int client_fd = it->first;
+			for (std::map<int, CgiFdInfo>::iterator fit = _cgiFds.begin(); fit != _cgiFds.end(); ++fit)
+				if (fit->second.client_fd == client_fd)
+					fit->second.should_close = true;
+			return;
+		}
+	}
+}
+
+void Webserv::reapChildrenNoHang(){
+	int status;
+	while (true)
+	{
+		pid_t r = waitpid(-1, &status, WNOHANG);
+		if (r > 0){
+			markReapedPid(r);
+			continue;
+		}
+		break;
+	}
 }
 
 //========================================================================
@@ -280,8 +340,12 @@ void Webserv::closeAll(){
 // - remove invalid clients/listeners
 void Webserv::eventLoop(){
 	while (true){
+		// global non blocking reap
+		reapChildrenNoHang();
+
 		// Graceful shutdown via signals.
 		if (g_stop){
+			killAllCgi(_clients);
 			closeAll();
 			Logger::shutdownMsg("Shutting down server peacefully...");
 			return;
@@ -291,7 +355,9 @@ void Webserv::eventLoop(){
 
 		// poll timeout 1000ms: wake up to update timeouts and react to g_stop
 		int rc = poll(&_pfds[0], _pfds.size(), 1000);
-		++g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1)
+			now = 0;
 
 		if (rc < 0){
 			// poll interrupted by signal -> restart loop
@@ -321,13 +387,31 @@ void Webserv::eventLoop(){
 
 			// While CGI is running, uses its own timeout
 			if (c.req_res.deferred && c.req_res.cgi.active){
-				if ((g_tick - c.las_activity_tick) > CGI_TIMEOUT_TICKS)
-					InsertReason::add(toRemove, cit->first, "cgi timeout");
+				if ((now - c.las_activity_tick) > CGI_TIMEOUT_SECONDS){
+					// close/mark all CGI fds for this client
+					for (std::map<int, CgiFdInfo>::iterator it = _cgiFds.begin(); it != _cgiFds.end(); it++){
+						if (it->second.client_fd == cit->first)
+							it->second.should_close = true;
+					}
+
+					// terminate CGI (non-blocking, global reap handles remaining)
+					terminateClientCgi(c);
+					
+					// prepare HTTP 504 response and let poll flush it
+					c.out = ResponseBuilder::buildErrorResponse(504, _config.servers[c.server_index]).toString();
+					c.log.status = 504;
+					c.log.bytes = c.out.size();
+					c.should_close = true;
+
+					setPollEvents(cit->first, POLLOUT);
+					c.las_activity_tick = now;
+					c.las_write_progress_tick = now;
+				}	
 				continue;
 			}
 
 			// If we have been writing for too long without progress -> remove
-			if (!c.out.empty() && (g_tick - c.las_write_progress_tick) > WRITE_STALL_TICKS){
+			if (!c.out.empty() && (now - c.las_write_progress_tick) > WRITE_STALL_SECONDS){
 				InsertReason::add(toRemove, cit->first, "write stall timeout");
 				continue;
 			}
@@ -335,7 +419,7 @@ void Webserv::eventLoop(){
 			// If we received something (in not empty) but have no output yet,
 			// treat as "waiting for full header/request".
 			if (!c.in.empty() && c.out.empty()){
-				if ((g_tick - c.las_activity_tick) > HEADER_TIMEOUT_TICKS)
+				if ((now - c.las_activity_tick) > HEADER_TIMEOUT_SECONDS)
 					InsertReason::add(toRemove, cit->first, "header timeout");
 				continue;
 			}
@@ -345,11 +429,11 @@ void Webserv::eventLoop(){
 			// - at least one request completed -> keep-alive timeout
 			if (c.in.empty() && c.out.empty()){
 				if (!c.has_completed_request){
-					if ((g_tick - c.las_activity_tick) > CONNECT_IDLE_TICKS)
+					if ((now - c.las_activity_tick) > CONNECT_IDLE_SECONDS)
 						InsertReason::add(toRemove, cit->first, "connect idle timeout");
 				}
 				else{
-					if ((g_tick - c.las_activity_tick) > KEEPALIVE_TICKS)
+					if ((now - c.las_activity_tick) > KEEPALIVE_SECONDS)
 						InsertReason::add(toRemove, cit->first, "keep-alive timeout");
 				}
 			}
@@ -391,14 +475,8 @@ void Webserv::eventLoop(){
 							c.should_close = true;
 							setPollEvents(client_fd, POLLOUT);
 							
-							// tries to terminate CGI process
-							if (c.req_res.cgi.pid > 0){
-								kill(c.req_res.cgi.pid, SIGKILL);
-								waitpid(c.req_res.cgi.pid, NULL, WNOHANG);
-								c.req_res.cgi.pid = -1;
-							}
-							c.req_res.cgi.active = false;
-							c.req_res.deferred = false;
+							// terminate CGI (non-blocking, global reap handles remaining)
+							terminateClientCgi(c);
 						}
 					}
 					continue;
@@ -534,8 +612,10 @@ void Webserv::acceptAll(int listen_fd){
 		c.has_completed_request = false;
 
 		// Timeout ticks
-		c.las_activity_tick = g_tick;
-		c.las_write_progress_tick = g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1) now = 0;
+		c.las_activity_tick = now;
+		c.las_write_progress_tick = now;
 
 		// Link client to the correct server config
 		c.server_index = it->second.server_index;
@@ -597,10 +677,12 @@ void Webserv::startDeferredCgiForClient(int client_fd){
 		}
 	}
 
-	// while CGI is running, we don´t want to work work with the client socket
-	setPollEvents(client_fd, 0);
+	// while CGI is running, use POLLIN to detect disconnect
+	setPollEvents(client_fd, POLLIN);
 	c.req_res.cgiRawOutput.clear();
-	c.las_activity_tick = g_tick;
+	time_t now = std::time(NULL);
+	if (now == (time_t)-1) now = 0;
+	c.las_activity_tick = now;
 }
 
 void Webserv::handleCgiWrite(int cgi_fd){
@@ -624,14 +706,18 @@ void Webserv::handleCgiWrite(int cgi_fd){
 	if (c.req_res.cgi.requestBody.empty()){
 		fit->second.should_close = true;
 		c.req_res.cgi.stdinFd = -1;
-		c.las_activity_tick = g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1) now = 0;
+		c.las_activity_tick = now;
 		return;
 	}
 
 	ssize_t n = write(cgi_fd, c.req_res.cgi.requestBody.data(), c.req_res.cgi.requestBody.size());
 	if (n > 0){
 		c.req_res.cgi.requestBody.erase(0, n);
-		c.las_activity_tick = g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1) now = 0;
+		c.las_activity_tick = now;
 		return;
 	}
 }
@@ -658,14 +744,15 @@ void Webserv::handleCgiRead(int cgi_fd){
 
 	if (n > 0){
 		c.req_res.cgiRawOutput.append(buf, n);
-		c.las_activity_tick = g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1) now = 0;
+		c.las_activity_tick = now;
 		return ;
 	}
 
 	if (n == 0){
 		// EOF reached
 		fit->second.should_close = true;
-		c.req_res.cgi.stdoutFd = -1;
 
 		// close stdin if it still exist
 		if (c.req_res.cgi.stdinFd >= 0){
@@ -673,12 +760,6 @@ void Webserv::handleCgiRead(int cgi_fd){
 			if (inIt != _cgiFds.end())
 				inIt->second.should_close = true;
 			c.req_res.cgi.stdinFd = -1;
-		}
-
-		// wait for process
-		if (c.req_res.cgi.pid > 0){
-			waitpid(c.req_res.cgi.pid, NULL, WNOHANG);
-			c.req_res.cgi.pid = -1;
 		}
 
 		// parse CGI output -> build HTTP string
@@ -736,8 +817,10 @@ void Webserv::handleCgiRead(int cgi_fd){
 
 		// Client will respond again
 		setPollEvents(client_fd, POLLOUT);
-		c.las_write_progress_tick = g_tick;
-		c.las_activity_tick = g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1) now = 0;
+		c.las_write_progress_tick = now;
+		c.las_activity_tick = now;
 		return;
 	}
 
@@ -761,6 +844,23 @@ void Webserv::handleClientRead(int fd){
 
 	Client &client = it->second;
 
+	// If CGI is running, don't process HTTP
+	// We only want to know if client closed (recv == 0)
+	if (client.req_res.deferred && client.req_res.cgi.active){
+		char tmp[1];
+		ssize_t r = recv(fd, tmp, sizeof(tmp), MSG_PEEK);
+		if (r == 0){
+			client.should_close = true; // event loop removes later
+
+			for (std::map<int, CgiFdInfo>::iterator fit = _cgiFds.begin(); fit != _cgiFds.end(); ++fit)
+				if (fit->second.client_fd == fd)
+					fit->second.should_close = true;
+
+			terminateClientCgi(client);
+		}
+		return ;
+	}
+
 	// If there is pending output, do not read more (simplifies the pipeline).
 	if (!client.out.empty())
 		return ;
@@ -770,7 +870,9 @@ void Webserv::handleClientRead(int fd){
 	ssize_t len = recv(fd, temp, sizeof(temp), 0);
 	if (len > 0){
 		client.in.append(temp, len);
-		client.las_activity_tick = g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1) now = 0;
+		client.las_activity_tick = now;
 	}
 	else if (len == 0){
 		// Peer closed the connection
@@ -816,7 +918,9 @@ void Webserv::handleClientRead(int fd){
 		client.log.status = result.response.getStatusCode();
 		client.log.bytes = client.out.size();
 
-		client.las_write_progress_tick = g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1) now = 0;
+		client.las_activity_tick = now;
 		setPollEvents(fd, POLLOUT);
 
 		return ;
@@ -830,7 +934,9 @@ void Webserv::handleClientRead(int fd){
 	client.log.status = err.getStatusCode();
 	client.log.bytes = client.out.size();
 	client.should_close = true;
-	client.las_write_progress_tick = g_tick;
+	time_t now = std::time(NULL);
+	if (now == (time_t)-1) now = 0;
+	client.las_write_progress_tick = now;
 	client.has_completed_request = true;
 	setPollEvents(fd, POLLOUT);
 	client.parser = HttpRequest();
@@ -860,8 +966,10 @@ void Webserv::handleClientWrite(int fd){
 	ssize_t sent = send(fd, client.out.data(), client.out.size(), 0);
 	if (sent > 0){
 		client.out.erase(0, sent);
-		client.las_write_progress_tick = g_tick;
-		client.las_activity_tick = g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1) now = 0;
+		client.las_write_progress_tick = now;
+		client.las_activity_tick = now;
 	}
 	else {
 		// send error: keep POLLOUT and retry later
@@ -910,7 +1018,9 @@ void Webserv::handleClientWrite(int fd){
 			client.log.status = result.response.getStatusCode();
 			client.log.bytes = client.out.size();
 
-			client.las_write_progress_tick = g_tick;
+			time_t now = std::time(NULL);
+			if (now == (time_t)-1) now = 0;
+			client.las_write_progress_tick = now;
 			setPollEvents(fd, POLLOUT);
 			return ;
 		}
@@ -923,7 +1033,9 @@ void Webserv::handleClientWrite(int fd){
 		client.log.bytes = client.out.size();
 
 		client.should_close = true;
-		client.las_write_progress_tick = g_tick;
+		time_t now = std::time(NULL);
+		if (now == (time_t)-1) now = 0;
+		client.las_write_progress_tick = now;
 		setPollEvents(fd, POLLOUT);
 		client.parser = HttpRequest();
 	}
@@ -932,12 +1044,36 @@ void Webserv::handleClientWrite(int fd){
 //========================================================================
 // removeClient / removeListen
 //========================================================================
+
+static void terminateClientCgi(Client &c){
+	// Force kill (global reaper handles the rest later)
+	if (c.req_res.cgi.pid > 0){
+		kill(c.req_res.cgi.pid, SIGKILL);
+		// r == 0 -> still running, keep pid for global reap
+	}
+
+	c.req_res.cgi.active = false;
+	c.req_res.deferred = false;
+}
+
 // Remove a client: remove from poll, close socket, erase from map.
 void Webserv::removeClient(int fd, std::string const &reason){
 	int listen_fd = -1;
+
+	// Always mark any CGI fds linked to this client for removal from poll/map
+	for (std::map<int, CgiFdInfo>::iterator fit = _cgiFds.begin(); fit != _cgiFds.end(); fit++){
+		if (fit->second.client_fd == fd)
+			fit->second.should_close = true;
+	}
+
 	std::map<int, Client>::iterator it = _clients.find(fd);
-	if (it != _clients.end())
+	if (it != _clients.end()){
 		listen_fd = it->second.listen_fd;
+
+		// Ensure any CGI owned by this client is terminated and reaped
+		terminateClientCgi(it->second);
+	}
+		
 
 	delPollFd(fd);
 	close(fd);

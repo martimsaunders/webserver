@@ -65,6 +65,8 @@ class Webserv
 		};
 		std::map<int, CgiFdInfo> _cgiFds;
 		bool isCgiFd(int fd) const;
+		void markReapedPid(pid_t pid);
+		void reapChildrenNoHang();
 		void handleCgiRead(int cgi_fd);
 		void handleCgiWrite(int cgi_fd);
 		void startDeferredCgiForClient(int client_fd);
